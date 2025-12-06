@@ -10,7 +10,6 @@ use thiserror::Error;
 #[derive(Debug)]
 pub(super) struct Reader {
     stdout: ChildStdout,
-    length: Option<u32>,
     buf: Vec<u8>
 }
 
@@ -33,39 +32,28 @@ impl Reader {
     pub(super) fn new(stdout: ChildStdout) -> Self {
         Self {
             stdout,
-            length: None,
             buf: Vec::with_capacity(Self::BUFSIZE)
         }
     }
 
     // TODO: heap efficiency
     pub(super) fn try_read(&mut self) -> Result<Option<Res>, TransportError> {
-        let this = self;
+        // Read length-prefixed (u32 LE) JSON string.
         {
-            if this.length.is_none() && this.buf.len() >= 4 {
-                let off = this.buf.split_off(4);
-                let bytes: &[u8] = &this.buf;
-                this.length = Some(u32::from_le_bytes(bytes.try_into().unwrap()));
-                this.buf = off;
-            }
-            match this.length.map(|u| u as usize) {
-                None => {}
-                Some(l) if this.buf.len() < l => {}
-                Some(l) => {
-                    let bytes: &[u8] = &this.buf[..l];
-                    log::debug!("RECV {}", unsafe { std::str::from_utf8_unchecked(bytes) });
-                    let msg: Res = serde_json::from_slice(bytes)?;
-                    this.length = None;
-                    this.buf = this.buf[l..].to_owned();
+            if self.buf.len() >= 4 {
+                let len = u32::from_le_bytes(self.buf[..4].try_into().unwrap()) as usize;
+                if self.buf.len() >= 4 + len {
+                    let bytes = self.buf[4..4 + len].to_vec();
+                    self.buf = self.buf[4 + len..].to_vec();
+                    log::debug!("RECV {}", unsafe { std::str::from_utf8_unchecked(&bytes) });
+                    let msg: Res = serde_json::from_slice(&bytes)?;
                     return Ok(Some(msg));
                 }
             }
         }
-        {
-            let mut buf = [0; Self::BUFSIZE];
-            let n = this.stdout.read(&mut buf)?;
-            this.buf.extend(&buf[..n]);
-        }
+        let mut buf = [0; Self::BUFSIZE];
+        let n = self.stdout.read(&mut buf)?;
+        self.buf.extend(&buf[..n]);
         Ok(None)
     }
 }

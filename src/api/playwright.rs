@@ -1,10 +1,11 @@
 pub use crate::imp::playwright::DeviceDescriptor;
 use crate::{
-    api::{browser_type::BrowserType, selectors::Selectors},
+    api::{api_request::APIRequest, browser_type::BrowserType, selectors::Selectors},
     imp::{core::*, playwright::Playwright as Impl, prelude::*},
     Error
 };
-use std::{io, process::Command};
+use std::{io, process::Command, time::Duration};
+use tokio::time::timeout;
 
 /// Entry point
 pub struct Playwright {
@@ -34,6 +35,7 @@ impl Playwright {
     /// Constructs from installed playwright driver
     pub async fn with_driver(driver: Driver) -> Result<Playwright, Error> {
         let conn = Connection::run(&driver.executable())?;
+        initialize_root(&conn).await?;
         let p = Impl::wait_initial_object(&conn).await?;
         Ok(Self {
             driver,
@@ -73,9 +75,14 @@ impl Playwright {
     pub fn driver(&mut self) -> &mut Driver { &mut self.driver }
 
     pub fn selectors(&self) -> Selectors {
-        let inner = weak_and_then(&self.inner, |rc| rc.selectors());
+        let inner = weak_and_then(&self.inner, |rc| {
+            rc.selectors().unwrap_or_else(Weak::new)
+        });
         Selectors::new(inner)
     }
+
+    /// Exposes API for Web API testing.
+    pub fn request(&self) -> APIRequest { APIRequest::new(self.inner.clone()) }
 
     /// Returns a dictionary of devices to be used with [`method: Browser.newContext`] or [`method: Browser.newPage`].
     ///
@@ -105,6 +112,20 @@ impl Playwright {
         let device = inner.device(name)?;
         Some(device.to_owned())
     }
+}
+
+async fn initialize_root(conn: &Connection) -> Result<(), Error> {
+    let mut params = Map::new();
+    // The Playwright driver validates against a fixed set of SDK labels; use
+    // "javascript" for compatibility.
+    params.insert("sdkLanguage".into(), Value::String("javascript".into()));
+
+    let wait = conn.send_initialize(params)?;
+    // First-time driver startup can take time while Node loads or antivirus scans the bundle.
+    let _ = timeout(Duration::from_secs(120), wait)
+        .await
+        .map_err(|_| Error::Timeout)??;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ use crate::{
 
 /// Whenever a network route is set up with [`method: Page.route`] or [`method: BrowserContext.route`], the `Route` object
 /// allows to handle the route.
+#[derive(Debug)]
 pub struct Route {
     inner: Weak<Impl>
 }
@@ -24,13 +25,16 @@ impl PartialEq for Route {
 }
 
 impl Route {
-    fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
 
     /// A request to be routed.
     pub fn request(&self) -> Request {
         let inner = weak_and_then(&self.inner, |rc| rc.request());
         Request::new(inner)
     }
+
+    /// Continue processing using the default handler (like Java/Python `fallback()`).
+    pub async fn fallback(&self) -> ArcResult<()> { upgrade(&self.inner)?.fallback().await }
 
     /// Aborts the route's request.
     /// Optional error code. Defaults to `failed`, could be one of the following:

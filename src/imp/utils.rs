@@ -1,4 +1,5 @@
 use crate::imp::prelude::*;
+use base64::{engine::general_purpose, Engine as _};
 
 #[derive(Debug, Deserialize, Clone, Serialize, PartialEq, Eq)]
 pub struct Viewport {
@@ -121,7 +122,8 @@ pub struct LocalStorageEntry {
 pub enum DocumentLoadState {
     DomContentLoaded,
     Load,
-    NetworkIdle
+    NetworkIdle,
+    Commit
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy)]
@@ -234,7 +236,7 @@ pub struct File {
 
 impl File {
     pub fn new(name: String, mime: String, body: &[u8]) -> Self {
-        let buffer = base64::encode(body);
+        let buffer = general_purpose::STANDARD.encode(body);
         Self { name, mime, buffer }
     }
 }

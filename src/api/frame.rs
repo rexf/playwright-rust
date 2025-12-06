@@ -10,7 +10,8 @@ use crate::{
         },
         prelude::*,
         utils::{DocumentLoadState, File, KeyboardModifier, MouseButton, Position}
-    }
+    },
+    api::{FrameLocator, Locator}
 };
 
 /// At every point of time, page exposes its current frame tree via the [`method: Page.mainFrame`] and
@@ -44,6 +45,7 @@ use crate::{
 /// })();
 /// ```
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct Frame {
     inner: Weak<Impl>
 }
@@ -68,6 +70,8 @@ macro_rules! is_checked {
 
 impl Frame {
     pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+
+    pub(crate) fn inner(&self) -> Weak<Impl> { self.inner.clone() }
 
     pub fn url(&self) -> Result<String, Error> { Ok(upgrade(&self.inner)?.url()) }
 
@@ -224,6 +228,16 @@ impl Frame {
     pub async fn query_selector_all(&self, selector: &str) -> ArcResult<Vec<ElementHandle>> {
         let es = upgrade(&self.inner)?.query_selector_all(selector).await?;
         Ok(es.into_iter().map(ElementHandle::new).collect())
+    }
+
+    /// Create a locator scoped to this frame.
+    pub fn locator(&self, selector: &str) -> Locator {
+        Locator::new(self.clone(), selector.to_owned())
+    }
+
+    /// Create a frame locator scoped to this frame (approximation).
+    pub fn frame_locator(&self, selector: &str) -> FrameLocator {
+        FrameLocator::new(self.clone(), selector.to_owned())
     }
 
     /// Returns the `frame` or `iframe` element handle which corresponds to this frame.

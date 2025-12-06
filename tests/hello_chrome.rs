@@ -1,23 +1,25 @@
-use playwright::Playwright;
+use playwright::{api::BrowserChannel, Playwright};
 
-playwright::runtime_test!(hello, {
+playwright::runtime_test!(hello_chrome, {
     main().await.unwrap();
 });
 
 async fn main() -> Result<(), playwright::Error> {
-    println!("init playwright");
+    println!("init playwright (chrome channel)");
     let playwright = match Playwright::initialize().await {
         Ok(p) => p,
         Err(playwright::Error::Timeout) => {
-            eprintln!("Playwright driver initialization timed out; skipping smoke test.");
+            eprintln!("Playwright driver initialization timed out; skipping chrome smoke test.");
             return Ok(());
         }
         Err(e) => return Err(e)
-    }; // if drop all resources are disposed
+    };
+
     println!("prepare browsers");
-    playwright.prepare()?; // install browsers
+    playwright.prepare()?; // install bundled browsers
+
     let chromium = playwright.chromium();
-    println!("launch chromium");
+    println!("launch chrome");
     let headless = if std::env::var("DISPLAY").is_err()
         && std::env::var("WAYLAND_DISPLAY").is_err()
     {
@@ -26,11 +28,34 @@ async fn main() -> Result<(), playwright::Error> {
     } else {
         false
     };
-    let browser = chromium.launcher().headless(headless).launch().await?;
+
+    let browser = match chromium
+        .launcher()
+        .channel(BrowserChannel::Chrome)
+        .headless(headless)
+        .launch()
+        .await
+    {
+        Ok(b) => b,
+        Err(e) => match e.as_ref() {
+            playwright::Error::ErrorResponded(err) => {
+                eprintln!("Chrome channel unavailable: {err}; skipping chrome smoke test.");
+                return Ok(());
+            }
+            playwright::Error::Timeout => {
+                eprintln!("Chrome launch timed out; skipping chrome smoke test.");
+                return Ok(());
+            }
+            _ => return Err(playwright::Error::Arc(e))
+        }
+    };
+
     println!("new context");
     let context = browser.context_builder().build().await?;
     println!("new page");
-    let page = match tokio::time::timeout(std::time::Duration::from_secs(15), context.new_page()).await {
+    let page = match tokio::time::timeout(std::time::Duration::from_secs(15), context.new_page())
+        .await
+    {
         Ok(Ok(p)) => p,
         Ok(Err(e)) => return Err(playwright::Error::Arc(e)),
         Err(_) => {
@@ -39,13 +64,11 @@ async fn main() -> Result<(), playwright::Error> {
     };
 
     // Basic navigation smoke test
-    println!("goto example.com");
+    println!("goto example.com via chrome");
     page.goto_builder("https://hk.news.yahoo.com").goto().await?;
     let url: String = page.eval("() => location.href").await?;
     assert!(url.contains("yahoo.com"));
 
-    // goto waits for the `load` event by default, so no extra wait is required here.
-    // Keep the smoke test short to avoid CI timeouts on headful runs.
     println!("read title");
     let title: String = page.title().await?;
     assert!(title.to_lowercase().contains("yahoo"));

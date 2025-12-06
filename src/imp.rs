@@ -5,15 +5,13 @@ pub(crate) mod prelude {
     pub use serde::{de::DeserializeOwned, Deserialize, Serialize};
     pub use serde_json::{
         map::Map,
-        value::{to_value, Value}
+        value::Value
     };
     pub use std::{
         collections::HashMap,
-        convert::{TryFrom, TryInto},
-        future::Future,
+        convert::TryInto,
         path::{Path, PathBuf},
-        pin::Pin,
-        sync::{Arc, Mutex, MutexGuard, Weak},
+        sync::{Arc, Mutex, Weak},
         task::{Poll, Waker},
         time::Duration
     };
@@ -103,6 +101,7 @@ pub(crate) mod binding_call;
 pub(crate) mod browser;
 pub(crate) mod browser_context;
 pub(crate) mod console_message;
+pub(crate) mod cdp_session;
 pub(crate) mod dialog;
 pub(crate) mod download;
 pub(crate) mod element_handle;
@@ -114,9 +113,13 @@ pub(crate) mod request;
 pub(crate) mod response;
 pub(crate) mod route;
 pub(crate) mod stream;
+pub(crate) mod tracing;
 pub(crate) mod video;
+pub(crate) mod web_error;
 pub(crate) mod websocket;
+pub(crate) mod websocket_route;
 pub(crate) mod worker;
+pub(crate) mod api_request_context;
 
 //_accessibility.py
 //_api_structures.py

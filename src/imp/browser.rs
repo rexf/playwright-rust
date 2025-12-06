@@ -3,8 +3,10 @@ use crate::imp::{
     browser_type::{RecordHar, RecordVideo},
     core::*,
     prelude::*,
-    utils::{ColorScheme, Geolocation, HttpCredentials, ProxySettings, StorageState, Viewport}
+    utils::{ColorScheme, Geolocation, HttpCredentials, ProxySettings, StorageState, Viewport},
+    artifact::Artifact
 };
+use tokio::sync::oneshot;
 
 #[derive(Debug)]
 pub(crate) struct Browser {
@@ -13,10 +15,17 @@ pub(crate) struct Browser {
     var: Mutex<Variable>
 }
 
+#[derive(Debug)]
+enum Either<R, C> {
+    Result(R),
+    Context(C)
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct Variable {
     contexts: Vec<Weak<BrowserContext>>,
-    is_remote: bool
+    is_remote: bool,
+    pending_context: Option<oneshot::Sender<Weak<BrowserContext>>>
 }
 
 impl Browser {
@@ -27,7 +36,8 @@ impl Browser {
             version,
             var: Mutex::new(Variable {
                 contexts: Vec::new(),
-                is_remote: false
+                is_remote: false,
+                pending_context: None
             })
         })
     }
@@ -50,7 +60,22 @@ impl Browser {
     }
 
     pub(crate) fn push_context(&self, c: Weak<BrowserContext>) {
-        self.var.lock().unwrap().contexts.push(c);
+        let mut lock = self.var.lock().unwrap();
+        lock.contexts.push(c);
+        log::debug!("browser.push_context -> total {}", lock.contexts.len());
+    }
+
+    pub(crate) fn take_pending_context_sender(
+        &self
+    ) -> Option<oneshot::Sender<Weak<BrowserContext>>> {
+        self.var.lock().unwrap().pending_context.take()
+    }
+
+    pub(crate) fn set_pending_context_sender(
+        &self,
+        tx: oneshot::Sender<Weak<BrowserContext>>
+    ) {
+        self.var.lock().unwrap().pending_context = Some(tx);
     }
 
     pub(super) fn remove_context(&self, c: &Weak<BrowserContext>) {
@@ -66,11 +91,63 @@ impl Browser {
         &self,
         args: NewContextArgs<'_, '_, '_, '_, '_, '_, '_>
     ) -> Result<Weak<BrowserContext>, Arc<Error>> {
-        let res = send_message!(self, "newContext", args);
-        let guid = only_guid(&res)?;
-        let c = get_object!(self.context()?.lock().unwrap(), guid, BrowserContext)?;
-        self.register_new_context(c.clone())?;
-        Ok(c)
+        use tokio::{select, time::{timeout, Duration}};
+
+        // Track existing contexts so we can fall back to the newly created one even if
+        // the protocol never delivers a `result` response (observed with newer drivers).
+        let existing = self.contexts();
+
+        // Manually send the request so we can time it out.
+        let req = self
+            .channel()
+            .create_request(Str::validate("newContext".into()).unwrap())
+            .set_args(args)?;
+        let fut = self.channel().send_message(req).await?;
+
+        // Listen for a BrowserContext __create__ event in parallel with the protocol
+        // response so we can return promptly even if the driver never sends a result.
+        let (tx, rx) = oneshot::channel::<Weak<BrowserContext>>();
+        self.set_pending_context_sender(tx);
+
+        let outcome = timeout(Duration::from_secs(30), async {
+            select! {
+                res = fut => Either::Result(res),
+                ctx = rx => Either::Context(ctx),
+            }
+        })
+        .await;
+
+        // Ensure the pending sender is cleared regardless of how we exit.
+        self.var.lock().unwrap().pending_context = None;
+
+        match outcome {
+            Ok(Either::Result(res)) => {
+                let res = res?;
+                let res = res.map_err(Error::ErrorResponded)?;
+                let guid = only_guid(&*res)?;
+                let c = get_object!(self.context()?.lock().unwrap(), guid, BrowserContext)?;
+                self.register_new_context(c.clone())?;
+                log::debug!("new_context resolved with guid {}", guid.as_str());
+                Ok(c)
+            }
+            Ok(Either::Context(ctx)) => {
+                match ctx {
+                    Ok(c) => {
+                        self.register_new_context(c.clone())?;
+                        log::debug!("new_context resolved via __create__ event");
+                        Ok(c)
+                    }
+                    Err(_) => {
+                        // Sender dropped; fall through to the time-based fallbacks.
+                        self.fallback_find_context(existing)
+                    }
+                }
+            }
+            Err(_) => {
+                // Timeout: try to find a newly created context from the __create__ events.
+                self.fallback_find_context(existing)
+            }
+        }
     }
 
     fn register_new_context(&self, c: Weak<BrowserContext>) -> Result<(), Arc<Error>> {
@@ -80,6 +157,58 @@ impl Browser {
         // let bc = upgrade(&c)?;
         // bc._options = params
         Ok(())
+    }
+
+    fn fallback_find_context(
+        &self,
+        existing: Vec<Weak<BrowserContext>>
+    ) -> Result<Weak<BrowserContext>, Arc<Error>> {
+        // First, try the contexts vector that tracks registrations.
+        let after = self.contexts();
+        log::warn!(
+            "new_context timeout; contexts before={}, after={}",
+            existing.len(),
+            after.len()
+        );
+        if let Some(new_ctx) = after
+            .iter()
+            .find(|ctx| !existing.iter().any(|old| old.ptr_eq(ctx)))
+        {
+            self.register_new_context(new_ctx.clone())?;
+            return Ok(new_ctx.clone());
+        }
+
+        // Next, inspect the browser's children added via __create__ events.
+        let children = self.channel().children();
+        log::debug!("new_context fallback scanning {} children", children.len());
+        for child in children.into_iter().rev() {
+            if let Some(RemoteArc::BrowserContext(ctx_arc)) = child.upgrade() {
+                let weak = Arc::downgrade(&ctx_arc);
+                self.register_new_context(weak.clone())?;
+                return Ok(weak);
+            }
+        }
+
+        // Finally, scan the raw connection object table for any BrowserContext whose
+        // parent is this browser.
+        if let Ok(ctx) = self.context() {
+            let objs = ctx.lock().unwrap().list_objects();
+            for obj in objs {
+                if let RemoteArc::BrowserContext(bc) = obj {
+                    if let Some(RemoteWeak::Browser(parent)) = bc.channel().parent.as_ref() {
+                        if let Some(parent_browser) = parent.upgrade() {
+                            if parent_browser.guid() == self.guid() {
+                                let weak = Arc::downgrade(&bc);
+                                self.register_new_context(weak.clone())?;
+                                return Ok(weak);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(Arc::new(Error::Timeout))
     }
 }
 
@@ -95,7 +224,7 @@ struct Initializer {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct NewContextArgs<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
     sdk_language: &'static str,
@@ -130,6 +259,69 @@ pub(crate) struct NewContextArgs<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
     pub(crate) record_har: Option<RecordHar<'k>>,
 
     pub(crate) storage_state: Option<StorageState>
+}
+
+impl<'e, 'f, 'g, 'h, 'i, 'j, 'k> Default for NewContextArgs<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
+    fn default() -> Self {
+        Self {
+            sdk_language: "javascript",
+            proxy: None,
+            viewport: None,
+            screen: None,
+            no_viewport: None,
+            ignore_https_errors: None,
+            js_enabled: None,
+            bypass_csp: None,
+            user_agent: None,
+            locale: None,
+            timezone_id: None,
+            geolocation: None,
+            permissions: None,
+            extra_http_headers: None,
+            offline: None,
+            http_credentials: None,
+            device_scale_factor: None,
+            is_mobile: None,
+            has_touch: None,
+            color_scheme: None,
+            accept_downloads: None,
+            chromium_sandbox: None,
+            record_video: None,
+            record_har: None,
+            storage_state: None
+        }
+    }
+}
+
+#[skip_serializing_none]
+#[derive(Debug, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct StartTracingArgs<'a> {
+    pub(crate) page: Option<Str<Guid>>,
+    pub(crate) path: Option<&'a str>,
+    pub(crate) screenshots: Option<bool>,
+    pub(crate) categories: Option<Vec<&'a str>>
+}
+
+impl Browser {
+    pub(crate) async fn start_tracing(&self, args: StartTracingArgs<'_>) -> ArcResult<()> {
+        let _ = send_message!(self, "startTracing", args);
+        Ok(())
+    }
+
+    pub(crate) async fn stop_tracing(&self) -> ArcResult<Weak<Artifact>> {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Res {
+            artifact: OnlyGuid
+        }
+        let v = send_message!(self, "stopTracing", Map::new());
+        let Res {
+            artifact: OnlyGuid { guid }
+        } = serde_json::from_value((*v).clone()).map_err(Error::Serde)?;
+        let artifact = get_object!(self.context()?.lock().unwrap(), &guid, Artifact)?;
+        Ok(artifact)
+    }
 }
 
 #[cfg(test)]

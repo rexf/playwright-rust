@@ -13,10 +13,14 @@ use crate::imp::{
         ColorScheme, DocumentLoadState, FloatRect, Header, Length, MouseButton, PdfMargins,
         ScreenshotType, Viewport
     },
+    route::Route,
     video::Video,
     websocket::WebSocket,
     worker::Worker
 };
+use std::fmt;
+use regex::Regex;
+use base64::{engine::general_purpose, Engine as _};
 
 #[derive(Debug)]
 pub(crate) struct Page {
@@ -34,7 +38,99 @@ pub(crate) struct Variable {
     timeout: Option<u32>,
     navigation_timeout: Option<u32>,
     workers: Vec<Weak<Worker>>,
-    video: Option<Video>
+    video: Option<Video>,
+    routes: Vec<RouteEntry>,
+    websocket_routes: Vec<WebSocketRouteEntry>
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SerializedError {
+    error: Option<InnerError>
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InnerError {
+    name: Option<String>,
+    message: Option<String>,
+    stack: Option<String>
+}
+
+fn format_error_value(v: &Value) -> Result<String, Error> {
+    let SerializedError { error } = serde_json::from_value(v.clone())?;
+    if let Some(InnerError {
+        name,
+        message,
+        stack
+    }) = error
+    {
+        let mut s = String::new();
+        if let Some(name) = name {
+            s.push_str(&name);
+        }
+        if let Some(message) = message {
+            if !s.is_empty() {
+                s.push_str(": ");
+            }
+            s.push_str(&message);
+        }
+        if let Some(stack) = stack {
+            if !stack.is_empty() {
+                s.push('\n');
+                s.push_str(&stack);
+            }
+        }
+        Ok(s)
+    } else {
+        Ok(String::new())
+    }
+}
+
+#[derive(Clone)]
+enum RoutePattern {
+    Glob(String),
+    Regex(String, String)
+}
+
+#[derive(Clone)]
+enum WebSocketRoutePattern {
+    Glob(String),
+    Regex(String, String)
+}
+
+#[derive(Clone)]
+struct RouteEntry {
+    pattern: RoutePattern,
+    handler: crate::imp::browser_context::RouteHandler
+}
+
+#[derive(Clone)]
+struct WebSocketRouteEntry {
+    pattern: WebSocketRoutePattern,
+    handler: crate::imp::browser_context::WebSocketRouteHandler
+}
+
+impl fmt::Debug for WebSocketRouteEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WebSocketRouteEntry")
+            .field("pattern", &match &self.pattern {
+                WebSocketRoutePattern::Glob(g) => format!("glob:{g}"),
+                WebSocketRoutePattern::Regex(s, f) => format!("regex:{s}/{f}")
+            })
+            .finish()
+    }
+}
+
+impl fmt::Debug for RouteEntry {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RouteEntry")
+            .field("pattern", &match &self.pattern {
+                RoutePattern::Glob(g) => format!("glob:{g}"),
+                RoutePattern::Regex(s, f) => format!("regex:{s}/{f}")
+            })
+            .finish()
+    }
 }
 
 macro_rules! navigation {
@@ -212,6 +308,304 @@ impl Page {
         self.mouse_click(args).await
     }
 
+    pub(crate) async fn route(
+        &self,
+        glob: &str,
+        handler: crate::imp::browser_context::RouteHandler
+    ) -> ArcResult<()> {
+        {
+            let mut var = self.var.lock().unwrap();
+            var.routes.push(RouteEntry {
+                pattern: RoutePattern::Glob(glob.to_owned()),
+                handler
+            });
+        }
+        let patterns = self.route_patterns();
+        self.set_network_interception_patterns(&patterns).await
+    }
+
+    pub(crate) async fn route_regex(
+        &self,
+        regex_source: &str,
+        regex_flags: &str,
+        handler: crate::imp::browser_context::RouteHandler
+    ) -> ArcResult<()> {
+        {
+            let mut var = self.var.lock().unwrap();
+            var.routes.push(RouteEntry {
+                pattern: RoutePattern::Regex(regex_source.to_owned(), regex_flags.to_owned()),
+                handler
+            });
+        }
+        let patterns = self.route_patterns();
+        self.set_network_interception_patterns(&patterns).await
+    }
+
+    pub(crate) async fn route_web_socket(
+        &self,
+        glob: &str,
+        handler: crate::imp::browser_context::WebSocketRouteHandler
+    ) -> ArcResult<()> {
+        {
+            let mut var = self.var.lock().unwrap();
+            var.websocket_routes.push(WebSocketRouteEntry {
+                pattern: WebSocketRoutePattern::Glob(glob.to_owned()),
+                handler
+            });
+        }
+        let patterns = self.websocket_route_patterns();
+        self.set_web_socket_interception_patterns(&patterns).await
+    }
+
+    pub(crate) async fn route_web_socket_regex(
+        &self,
+        regex_source: &str,
+        regex_flags: &str,
+        handler: crate::imp::browser_context::WebSocketRouteHandler
+    ) -> ArcResult<()> {
+        {
+            let mut var = self.var.lock().unwrap();
+            var.websocket_routes.push(WebSocketRouteEntry {
+                pattern: WebSocketRoutePattern::Regex(
+                    regex_source.to_owned(),
+                    regex_flags.to_owned()
+                ),
+                handler
+            });
+        }
+        let patterns = self.websocket_route_patterns();
+        self.set_web_socket_interception_patterns(&patterns).await
+    }
+
+    pub(crate) async fn unroute_web_socket(&self, glob: Option<&str>) -> ArcResult<()> {
+        {
+            let mut var = self.var.lock().unwrap();
+            if let Some(g) = glob {
+                var.websocket_routes.retain(|r| match &r.pattern {
+                    WebSocketRoutePattern::Glob(s) => s != g,
+                    WebSocketRoutePattern::Regex(src, _) => src != g
+                });
+            } else {
+                var.websocket_routes.clear();
+            }
+        }
+        let patterns = self.websocket_route_patterns();
+        self.set_web_socket_interception_patterns(&patterns).await
+    }
+
+    pub(crate) async fn unroute(&self, glob: Option<&str>) -> ArcResult<()> {
+        {
+            let mut var = self.var.lock().unwrap();
+            if let Some(g) = glob {
+                var.routes.retain(|r| match &r.pattern {
+                    RoutePattern::Glob(s) => s != g,
+                    RoutePattern::Regex(src, _) => src != g
+                });
+            } else {
+                var.routes.clear();
+            }
+        }
+        let patterns = self.route_patterns();
+        self.set_network_interception_patterns(&patterns).await
+    }
+
+    fn route_patterns(&self) -> Vec<RoutePattern> {
+        let mut patterns: Vec<RoutePattern> =
+            self.var.lock().unwrap().routes.iter().map(|r| r.pattern.clone()).collect();
+        let mut seen = std::collections::HashSet::new();
+        patterns.retain(|p| {
+            let k = match p {
+                RoutePattern::Glob(g) => format!("g:{}", g),
+                RoutePattern::Regex(s, f) => format!("r:{}/{}", s, f)
+            };
+            seen.insert(k)
+        });
+        patterns
+    }
+
+    async fn set_network_interception_patterns(&self, patterns: &[RoutePattern]) -> ArcResult<()> {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Pattern<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            glob: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            regex_source: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            regex_flags: Option<&'a str>
+        }
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args<'a> {
+            patterns: Vec<Pattern<'a>>
+        }
+        let args = Args {
+            patterns: patterns
+                .iter()
+                .map(|p| match p {
+                    RoutePattern::Glob(g) => Pattern {
+                        glob: Some(g.as_str()),
+                        regex_source: None,
+                        regex_flags: None
+                    },
+                    RoutePattern::Regex(s, f) => Pattern {
+                        glob: None,
+                        regex_source: Some(s.as_str()),
+                        regex_flags: Some(f.as_str())
+                    }
+                })
+                .collect()
+        };
+        let _ = send_message!(self, "setNetworkInterceptionPatterns", args);
+        Ok(())
+    }
+
+    fn websocket_route_patterns(&self) -> Vec<WebSocketRoutePattern> {
+        let mut patterns: Vec<WebSocketRoutePattern> = self
+            .var
+            .lock()
+            .unwrap()
+            .websocket_routes
+            .iter()
+            .map(|r| r.pattern.clone())
+            .collect();
+        let mut seen = std::collections::HashSet::new();
+        patterns.retain(|p| {
+            let k = match p {
+                WebSocketRoutePattern::Glob(g) => format!("g:{}", g),
+                WebSocketRoutePattern::Regex(s, f) => format!("r:{}/{}", s, f)
+            };
+            seen.insert(k)
+        });
+        patterns
+    }
+
+    async fn set_web_socket_interception_patterns(
+        &self,
+        patterns: &[WebSocketRoutePattern]
+    ) -> ArcResult<()> {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Pattern<'a> {
+            #[serde(skip_serializing_if = "Option::is_none")]
+            glob: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            regex_source: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            regex_flags: Option<&'a str>
+        }
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args<'a> {
+            patterns: Vec<Pattern<'a>>
+        }
+        let args = Args {
+            patterns: patterns
+                .iter()
+                .map(|p| match p {
+                    WebSocketRoutePattern::Glob(g) => Pattern {
+                        glob: Some(g.as_str()),
+                        regex_source: None,
+                        regex_flags: None
+                    },
+                    WebSocketRoutePattern::Regex(s, f) => Pattern {
+                        glob: None,
+                        regex_source: Some(s.as_str()),
+                        regex_flags: Some(f.as_str())
+                    }
+                })
+                .collect()
+        };
+        let _ = send_message!(self, "setWebSocketInterceptionPatterns", args);
+        Ok(())
+    }
+
+    fn ws_matches(pattern: &WebSocketRoutePattern, url: &str) -> bool {
+        match pattern {
+            WebSocketRoutePattern::Glob(g) => {
+                if g == "*" || g == "**" {
+                    return true;
+                }
+                let mut regex = String::from("^");
+                for ch in g.chars() {
+                    match ch {
+                        '*' => regex.push_str(".*"),
+                        '.' => regex.push_str("\\."),
+                        '?' => regex.push('.'),
+                        c => regex.push(c)
+                    }
+                }
+                regex.push('$');
+                Regex::new(&regex).map(|re| re.is_match(url)).unwrap_or(false)
+            }
+            WebSocketRoutePattern::Regex(source, flags) => {
+                let mut builder = regex::RegexBuilder::new(source);
+                if flags.contains('i') {
+                    builder.case_insensitive(true);
+                }
+                builder.build().map(|re| re.is_match(url)).unwrap_or(false)
+            }
+        }
+    }
+
+    fn on_route(&self, ctx: &Context, params: Map<String, Value>) -> Result<(), Error> {
+        let first = first_object(&params).ok_or(Error::InvalidParams)?;
+        let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+        let route: Weak<Route> = get_object!(ctx, &guid, Route)?;
+        let mut handled = false;
+        {
+            let handler = self.var.lock().unwrap().routes.last().cloned();
+            if let Some(RouteEntry { handler: cb, .. }) = handler {
+                handled = true;
+                let r = route.clone();
+                tokio::spawn(async move {
+                    if let Some(route_arc) = r.upgrade() {
+                        cb(route_arc).await;
+                    }
+                });
+            }
+        }
+        if !handled {
+            if let Some(ctx) = self.browser_context().upgrade() {
+                ctx.handle_route_from_page(route.clone());
+            } else if let Some(r) = route.upgrade() {
+                tokio::spawn(async move {
+                    let _ = r.fallback().await;
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn on_web_socket_route(&self, ctx: &Context, params: Map<String, Value>) -> Result<(), Error> {
+        let first = first_object(&params).ok_or(Error::InvalidParams)?;
+        let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+        let route = get_object!(ctx, &guid, WebSocketRoute)?;
+        let mut handled = false;
+        let url = route.upgrade().map(|r| r.url().to_owned());
+        if let Some(url) = url {
+            let var = self.var.lock().unwrap();
+            if let Some(entry) =
+                var.websocket_routes.iter().rfind(|entry| Self::ws_matches(&entry.pattern, &url))
+            {
+                handled = true;
+                let cb = entry.handler.clone();
+                let r = route.clone();
+                tokio::spawn(async move {
+                    if let Some(route_arc) = r.upgrade() {
+                        cb(route_arc).await;
+                    }
+                });
+            }
+        }
+        if !handled {
+            if let Some(ctx) = self.browser_context().upgrade() {
+                ctx.handle_web_socket_route(route.clone());
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) async fn accessibility_snapshot(
         &self,
         args: AccessibilitySnapshotArgs
@@ -245,7 +639,7 @@ impl Page {
         let path = args.path.clone();
         let v = send_message!(self, "pdf", args);
         let b64 = only_str(&v)?;
-        let bytes = base64::decode(b64).map_err(Error::InvalidBase64)?;
+        let bytes = general_purpose::STANDARD.decode(b64).map_err(Error::InvalidBase64)?;
         may_save(path.as_deref(), &bytes)?;
         Ok(bytes)
     }
@@ -266,7 +660,7 @@ impl Page {
         let path = args.path.clone();
         let v = send_message!(self, "screenshot", args);
         let b64 = only_str(&v)?;
-        let bytes = base64::decode(b64).map_err(Error::InvalidBase64)?;
+        let bytes = general_purpose::STANDARD.decode(b64).map_err(Error::InvalidBase64)?;
         may_save(path.as_deref(), &bytes)?;
         Ok(bytes)
     }
@@ -506,7 +900,7 @@ impl Page {
         } = serde_json::from_value(params.into())?;
         let element = get_object!(ctx, &guid, ElementHandle)?;
         let this = get_object!(ctx, self.guid(), Page)?;
-        let file_chooser = FileChooser::new(this, element, is_multiple);
+        let _file_chooser = FileChooser::new(this, element, is_multiple);
         // self.emit_event(Evt::FileChooser(file_chooser));
         Ok(())
     }
@@ -543,6 +937,12 @@ impl RemoteObject for Page {
                 let console = get_object!(ctx, &guid, ConsoleMessage)?;
                 self.emit_event(Evt::Console(console));
             }
+            "pageerror" | "pageError" => {
+                if let Some(err) = params.get("error") {
+                    let msg = format_error_value(err)?;
+                    self.emit_event(Evt::PageError(msg));
+                }
+            }
             "request" => {
                 let first = first_object(&params).ok_or(Error::InvalidParams)?;
                 let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
@@ -557,12 +957,14 @@ impl RemoteObject for Page {
                 let response = get_object!(ctx, &guid, Response)?;
                 self.emit_event(Evt::Response(response));
             }
+            "route" => self.on_route(ctx, params)?,
             "popup" => {
                 let first = first_object(&params).ok_or(Error::InvalidParams)?;
                 let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
                 let page = get_object!(ctx, &guid, Page)?;
                 self.emit_event(Evt::Popup(page));
             }
+            "webSocketRoute" => self.on_web_socket_route(ctx, params)?,
             "websocket" => {
                 let first = first_object(&params).ok_or(Error::InvalidParams)?;
                 let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
@@ -595,8 +997,7 @@ pub(crate) enum Evt {
     /// Not Implemented Yet
     // FileChooser(FileChooser),
     DomContentLoaded,
-    /// Not Implemented Yet
-    PageError,
+    PageError(String),
     Request(Weak<Request>),
     Response(Weak<Response>),
     RequestFailed(Weak<Request>),
@@ -653,7 +1054,7 @@ impl IsEvent for Evt {
             Self::Download(_) => EventType::Download,
             // Self::FileChooser(_) => EventType::FileChooser,
             Self::DomContentLoaded => EventType::DomContentLoaded,
-            Self::PageError => EventType::PageError,
+            Self::PageError(_) => EventType::PageError,
             Self::Request(_) => EventType::Request,
             Self::Response(_) => EventType::Response,
             Self::RequestFailed(_) => EventType::RequestFailed,

@@ -1,6 +1,4 @@
-use crate::imp::{
-    core::*, element_handle::ElementHandle as ElementHandleImpl, page::Page as PageImpl, prelude::*
-};
+use crate::imp::{element_handle::ElementHandle as ElementHandleImpl, page::Page as PageImpl, prelude::*};
 
 /// `FileChooser` objects are dispatched by the page in the [page::Event::FileChooser](crate::api::page::Event::FileChooser) event.
 ///

@@ -597,6 +597,7 @@ enum Handle {
 }
 
 #[skip_serializing_none]
+#[skip_serializing_none]
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GotoArgs<'a, 'b> {
@@ -610,7 +611,7 @@ impl<'a> GotoArgs<'a, '_> {
     pub(crate) fn new(url: &'a str) -> Self {
         Self {
             url,
-            timeout: None,
+            timeout: Some(30000.0),
             wait_until: None,
             referer: None
         }
@@ -626,7 +627,7 @@ pub(crate) struct ClickArgs<'a> {
     pub(crate) position: Option<Position>,
     pub(crate) delay: Option<f64>,
     pub(crate) button: Option<MouseButton>,
-    /// Is ignored if dblclick
+    // Is ignored if dblclick
     pub(crate) click_count: Option<i32>,
     pub(crate) timeout: Option<f64>,
     pub(crate) force: Option<bool>,
@@ -642,7 +643,7 @@ impl<'a> ClickArgs<'a> {
             position: None,
             delay: None,
             button: None,
-            /// Is ignored if dblclick
+            // Is ignored if dblclick
             click_count: None,
             timeout: None,
             force: None,

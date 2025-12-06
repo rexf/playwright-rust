@@ -1,6 +1,6 @@
 pub use crate::imp::browser_type::{RecordHar, RecordVideo};
 use crate::{
-    api::BrowserContext,
+    api::{Artifact, BrowserContext, Page},
     imp::{
         self,
         browser::NewContextArgs,
@@ -72,11 +72,44 @@ impl Browser {
     }
 
     // new_browser_cdp_session
-    // start_tracing
-    // stop_tracing
+
+    /// Start Chromium tracing. See [`Browser::stop_tracing`] to retrieve the trace.
+    pub async fn start_tracing(
+        &self,
+        page: Option<&Page>,
+        options: StartTracingOptions<'_>
+    ) -> ArcResult<()> {
+        let inner = upgrade(&self.inner)?;
+        let page = page
+            .and_then(|p| p.inner().upgrade())
+            .map(|p| p.guid().to_owned());
+        inner
+            .start_tracing(imp::browser::StartTracingArgs {
+            page,
+            path: options.path,
+            screenshots: options.screenshots,
+            categories: options.categories.map(|v| v.iter().map(|s| *s).collect())
+        })
+        .await
+    }
+
+    /// Stop tracing and return the resulting trace artifact (zip). Save it with [`Artifact::save_as`].
+    pub async fn stop_tracing(&self) -> ArcResult<Artifact> {
+        let inner = upgrade(&self.inner)?;
+        let artifact = inner.stop_tracing().await?;
+        Ok(Artifact::new(artifact))
+    }
 }
 
 // TODO: async drop
+
+/// Options for [`Browser::start_tracing`]
+#[derive(Debug, Default)]
+pub struct StartTracingOptions<'a> {
+    pub path: Option<&'a str>,
+    pub screenshots: Option<bool>,
+    pub categories: Option<&'a [&'a str]>
+}
 
 /// [`Browser::context_builder`]
 pub struct ContextBuilder<'e, 'f, 'g, 'h, 'i, 'j, 'k> {

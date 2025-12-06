@@ -1,0 +1,29 @@
+[build]
+rustc-wrapper = "sccache"
+
+[alias]
+release-musl = "build --release --target x86_64-unknown-linux-musl"
+
+[target.x86_64-unknown-linux-musl]
+rustflags = [
+    "-C", "target-feature=+crt-static",
+    "-C", "link-self-contained=yes",
+]
+
+[profile.release]
+codegen-units = 1
+debug = false
+incremental = true
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+[profile.dev]
+codegen-units = 256
+debug = true
+incremental = true
+lto = false
+opt-level = 0
+panic = "unwind"
+strip = false

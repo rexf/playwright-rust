@@ -12,8 +12,9 @@ pub use crate::{
 };
 use crate::{
     api::{
-        input_device::*, Accessibility, BrowserContext, ConsoleMessage, ElementHandle, FileChooser,
-        Frame, Keyboard, Response, TouchScreen, Video, WebSocket, Worker
+        input_device::*, Accessibility, BrowserContext, ConsoleMessage, ElementHandle, Frame,
+        FrameLocator, Keyboard, Locator, Response, Route, TouchScreen, Video, WebSocket, Worker,
+        WebSocketRoute
     },
     imp::{
         core::*,
@@ -27,6 +28,7 @@ use crate::{
     },
     Error
 };
+use regex::Regex;
 
 /// Page provides methods to interact with a single tab in a `Browser`, or an
 /// [extension background page](https://developer.chrome.com/extensions/background_pages) in Chromium. One `Browser`
@@ -97,6 +99,8 @@ impl Page {
         }
     }
 
+    pub(crate) fn inner(&self) -> Weak<Impl> { self.inner.clone() }
+
     pub fn context(&self) -> BrowserContext {
         BrowserContext::new(weak_and_then(&self.inner, |rc| rc.browser_context()))
     }
@@ -115,6 +119,16 @@ impl Page {
             .into_iter()
             .map(Frame::new)
             .collect())
+    }
+
+    /// Create a locator relative to the main frame.
+    pub fn locator(&self, selector: &str) -> Locator {
+        Locator::new(self.main_frame(), selector.to_owned())
+    }
+
+    /// Create a frame locator (approximate) relative to the main frame.
+    pub fn frame_locator(&self, selector: &str) -> FrameLocator {
+        FrameLocator::new(self.main_frame(), selector.to_owned())
     }
 
     /// This method returns all of the dedicated [WebWorkers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)
@@ -335,8 +349,89 @@ impl Page {
     // coverage
     // expose_binding
     // expose_function
-    // route
-    // unroute
+    /// Route network requests for this page only.
+    pub async fn route<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
+    where
+        F: Fn(Route) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static
+    {
+        upgrade(&self.inner)?
+            .route(
+                glob,
+                Arc::new(move |route| {
+                    let route = Route::new(Arc::downgrade(&route));
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
+
+    /// Add a regex-based route handler for this page.
+    pub async fn route_regex<F, Fut>(&self, regex: &Regex, handler: F) -> ArcResult<()>
+    where
+        F: Fn(Route) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static
+    {
+        upgrade(&self.inner)?
+            .route_regex(
+                regex.as_str(),
+                regex.as_str().contains("(?i)").then_some("i").unwrap_or(""),
+                Arc::new(move |route| {
+                    let route = Route::new(Arc::downgrade(&route));
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
+
+    /// Route websocket connections for this page only using a glob pattern.
+    pub async fn route_web_socket<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
+    where
+        F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static
+    {
+        upgrade(&self.inner)?
+            .route_web_socket(
+                glob,
+                Arc::new(move |route| {
+                    let route =
+                        WebSocketRoute::new(Arc::downgrade(&route), crate::api::WebSocketRouteSide::Page);
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
+
+    pub async fn route_web_socket_regex<F, Fut>(
+        &self,
+        regex: &Regex,
+        handler: F
+    ) -> ArcResult<()>
+    where
+        F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
+        Fut: std::future::Future<Output = ()> + Send + 'static
+    {
+        upgrade(&self.inner)?
+            .route_web_socket_regex(
+                regex.as_str(),
+                regex.as_str().contains("(?i)").then_some("i").unwrap_or(""),
+                Arc::new(move |route| {
+                    let route =
+                        WebSocketRoute::new(Arc::downgrade(&route), crate::api::WebSocketRouteSide::Page);
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
+
+    pub async fn unroute_web_socket(&self, glob: Option<&str>) -> ArcResult<()> {
+        upgrade(&self.inner)?.unroute_web_socket(glob).await
+    }
+
+    /// Remove previously registered page routes. If `glob` is `None` all routes are removed.
+    pub async fn unroute(&self, glob: Option<&str>) -> ArcResult<()> {
+        upgrade(&self.inner)?.unroute(glob).await
+    }
     // once_dialog
 
     pub async fn wait_for_timeout(&self, timeout: f64) {
@@ -391,7 +486,7 @@ pub enum Event {
     FrameDetached(Frame),
     FrameNavigated(Frame),
     Load,
-    PageError,
+    PageError(String),
     /// Emitted when the page opens a new tab or window. This event is emitted in addition to the
     /// [`event: BrowserContext.page`], but only for popups relevant to this page.
     ///
@@ -439,7 +534,7 @@ impl From<Evt> for Event {
             Evt::Download(x) => Event::Download(Download::new(x)),
             // Evt::FileChooser(x) => Event::FileChooser(x),
             Evt::DomContentLoaded => Event::DomContentLoaded,
-            Evt::PageError => Event::PageError,
+            Evt::PageError(msg) => Event::PageError(msg),
             Evt::Request(x) => Event::Request(Request::new(x)),
             Evt::Response(x) => Event::Response(Response::new(x)),
             Evt::RequestFailed(x) => Event::RequestFailed(Request::new(x)),
@@ -468,7 +563,7 @@ impl IsEvent for Event {
             Self::Download(_) => EventType::Download,
             // Self::FileChooser(_) => EventType::FileChooser,
             Self::DomContentLoaded => EventType::DomContentLoaded,
-            Self::PageError => EventType::PageError,
+            Self::PageError(_) => EventType::PageError,
             Self::Request(_) => EventType::Request,
             Self::Response(_) => EventType::Response,
             Self::RequestFailed(_) => EventType::RequestFailed,

@@ -4,7 +4,10 @@ use std::{
     path::{Path, PathBuf, MAIN_SEPARATOR}
 };
 
-const DRIVER_VERSION: &str = "1.11.0-1620331022000";
+// Match the Playwright release tag (e.g. 1.57.0). This is the version of the
+// upstream driver bundle that gets embedded and later installs the browsers
+// (Chromium/Firefox/WebKit) at runtime.
+const DRIVER_VERSION: &str = "1.57.0";
 
 fn main() {
     let out_dir: PathBuf = env::var_os("OUT_DIR").unwrap().into();
@@ -75,11 +78,11 @@ fn check_size(p: &Path) {
 fn download(_url: &str, dest: &Path) { File::create(dest).unwrap(); }
 
 fn url(platform: PlaywrightPlatform) -> String {
-    // let next = DRIVER_VERSION
-    //    .contains("next")
-    //    .then(|| "/next")
-    //    .unwrap_or_default();
-    let next = "/next";
+    // Nightly builds live under /next; stable tags do not.
+    let next = DRIVER_VERSION
+        .contains("next")
+        .then(|| "/next")
+        .unwrap_or_default();
     format!(
         "https://playwright.azureedge.net/builds/driver{}/playwright-{}-{}.zip",
         next, DRIVER_VERSION, platform
@@ -88,40 +91,59 @@ fn url(platform: PlaywrightPlatform) -> String {
 
 #[derive(Clone, Copy)]
 enum PlaywrightPlatform {
-    Linux,
+    LinuxX64,
+    LinuxArm64,
     Win32,
     Win32x64,
-    Mac
+    MacX64,
+    MacArm64
 }
 
 impl fmt::Display for PlaywrightPlatform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Linux => write!(f, "linux"),
+            Self::LinuxX64 => write!(f, "linux"),
+            Self::LinuxArm64 => write!(f, "linux-arm64"),
             Self::Win32 => write!(f, "win32"),
             Self::Win32x64 => write!(f, "win32_x64"),
-            Self::Mac => write!(f, "mac")
+            Self::MacX64 => write!(f, "mac"),
+            Self::MacArm64 => write!(f, "mac-arm64")
         }
     }
 }
 
 impl Default for PlaywrightPlatform {
     fn default() -> Self {
-        match env::var("CARGO_CFG_TARGET_OS").as_deref() {
-            Ok("linux") => return PlaywrightPlatform::Linux,
-            Ok("macos") => return PlaywrightPlatform::Mac,
-            _ => ()
-        };
-        if env::var("CARGO_CFG_WINDOWS").is_ok() {
-            if env::var("CARGO_CFG_TARGET_POINTER_WIDTH").as_deref() == Ok("64") {
-                PlaywrightPlatform::Win32x64
-            } else {
-                PlaywrightPlatform::Win32
+        let os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+        let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+        match os.as_str() {
+            "linux" => {
+                if arch == "aarch64" {
+                    PlaywrightPlatform::LinuxArm64
+                } else {
+                    PlaywrightPlatform::LinuxX64
+                }
             }
-        } else if env::var("CARGO_CFG_UNIX").is_ok() {
-            PlaywrightPlatform::Linux
-        } else {
-            panic!("Unsupported plaform");
+            "macos" => {
+                if arch == "aarch64" {
+                    PlaywrightPlatform::MacArm64
+                } else {
+                    PlaywrightPlatform::MacX64
+                }
+            }
+            _ => {
+                if env::var("CARGO_CFG_WINDOWS").is_ok() {
+                    if env::var("CARGO_CFG_TARGET_POINTER_WIDTH").as_deref() == Ok("64") {
+                        PlaywrightPlatform::Win32x64
+                    } else {
+                        PlaywrightPlatform::Win32
+                    }
+                } else if env::var("CARGO_CFG_UNIX").is_ok() {
+                    PlaywrightPlatform::LinuxX64
+                } else {
+                    panic!("Unsupported plaform");
+                }
+            }
         }
     }
 }

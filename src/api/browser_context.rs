@@ -1,6 +1,6 @@
 pub use crate::imp::browser_context::EventType;
 use crate::{
-    api::{Browser, Page},
+    api::{Browser, Page, Route, Frame, CDPSession, Tracing, WebError, ConsoleMessage, Request, Response, APIRequestContext},
     imp::{
         browser_context::{BrowserContext as Impl, Evt},
         core::*,
@@ -9,6 +9,10 @@ use crate::{
     },
     Error
 };
+use std::pin::Pin;
+use regex::Regex;
+use std::{future::Future, sync::Arc};
+use crate::api::websocket_route::{WebSocketRoute, Side as WebSocketRouteSide};
 
 /// BrowserContexts provide a way to operate multiple independent browser sessions.
 ///
@@ -50,10 +54,42 @@ impl BrowserContext {
         Ok(upgrade(&self.inner)?.browser().map(Browser::new))
     }
 
+    /// Access tracing controller for this context.
+    pub fn tracing(&self) -> Result<Tracing, Error> {
+        let inner = upgrade(&self.inner)?;
+        let tracing = inner.tracing().ok_or(Error::ObjectNotFound)?;
+        Ok(Tracing::new(tracing))
+    }
+
+    /// Shared API request context associated with this browser context.
+    pub fn request(&self) -> Result<APIRequestContext, Error> {
+        let inner = upgrade(&self.inner)?;
+        let request = inner.request_context().ok_or(Error::ObjectNotFound)?;
+        Ok(APIRequestContext::new(request))
+    }
+
     /// Creates a new page in the browser context.
     pub async fn new_page(&self) -> Result<Page, Arc<Error>> {
         let inner = upgrade(&self.inner)?;
         Ok(Page::new(inner.new_page().await?))
+    }
+
+    /// Create a new CDP session targeting the given page.
+    pub async fn new_cdp_session(&self, page: &Page) -> ArcResult<CDPSession> {
+        let inner = upgrade(&self.inner)?;
+        let session = inner
+            .new_cdp_session_with_page(page.inner().clone())
+            .await?;
+        Ok(CDPSession::new(session))
+    }
+
+    /// Create a new CDP session targeting the given frame.
+    pub async fn new_cdp_session_for_frame(&self, frame: &Frame) -> ArcResult<CDPSession> {
+        let inner = upgrade(&self.inner)?;
+        let session = inner
+            .new_cdp_session_with_frame(frame.inner().clone())
+            .await?;
+        Ok(CDPSession::new(session))
     }
 
     pub async fn set_default_navigation_timeout(&self, timeout: u32) -> ArcResult<()> {
@@ -185,9 +221,117 @@ impl BrowserContext {
 
     // async fn expose_function(&mut self) -> Result<(), Error> { unimplemented!() }
 
-    // async fn route(&mut self) -> Result<(), Error> { unimplemented!() }
+    /// Enable request routing for the given glob pattern. Routes are handled on this context; the provided async handler
+    /// is invoked for every matching request.
+    pub async fn route<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
+    where
+        F: Fn(Route) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static
+    {
+        let inner = upgrade(&self.inner)?;
+        inner
+            .route(
+                glob,
+                Arc::new(move |route| {
+                    let route = Route::new(Arc::downgrade(&route));
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
 
-    // async fn unroute(&mut self) -> Result<(), Error> { unimplemented!() }
+    /// Adds a glob-based route handler that will be removed after it is used `times` times.
+    pub async fn route_times<F, Fut>(&self, glob: &str, times: u32, handler: F) -> ArcResult<()>
+    where
+        F: Fn(Route) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static
+    {
+        let handler = Arc::new(move |route: Arc<_>| {
+            let route = Route::new(Arc::downgrade(&route));
+            Box::pin(handler(route)) as Pin<Box<dyn Future<Output = ()> + Send>>
+        });
+        upgrade(&self.inner)?
+            .route_with_times_glob(glob, times, handler)
+            .await
+    }
+
+    /// Adds a regex-based route handler.
+    pub async fn route_regex<F, Fut>(&self, regex: &Regex, handler: F) -> ArcResult<()>
+    where
+        F: Fn(Route) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static
+    {
+        upgrade(&self.inner)?
+            .route_regex(
+                regex.as_str(),
+                regex.as_str().contains("(?i)").then_some("i").unwrap_or(""),
+                Arc::new(move |route| {
+                    let route = Route::new(Arc::downgrade(&route));
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
+
+    /// Remove any previously installed route handler.
+    pub async fn unroute(&self) -> ArcResult<()> {
+        upgrade(&self.inner)?.unroute(None).await
+    }
+
+    /// Remove route handlers matching the given glob pattern.
+    pub async fn unroute_glob(&self, glob: &str) -> ArcResult<()> {
+        upgrade(&self.inner)?.unroute(Some(glob)).await
+    }
+
+    /// Remove route handlers matching the given regex pattern string.
+    pub async fn unroute_regex(&self, regex: &Regex) -> ArcResult<()> {
+        // Best-effort: match by pattern string; flags not tracked separately.
+        upgrade(&self.inner)?.unroute(Some(regex.as_str())).await
+    }
+
+    /// Enable websocket routing for the given glob pattern.
+    pub async fn route_web_socket<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
+    where
+        F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static
+    {
+        let inner = upgrade(&self.inner)?;
+        inner
+            .route_web_socket(
+                glob,
+                Arc::new(move |route| {
+                    let route = WebSocketRoute::new(Arc::downgrade(&route), WebSocketRouteSide::Page);
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
+
+    /// Regex-based websocket routing.
+    pub async fn route_web_socket_regex<F, Fut>(
+        &self,
+        regex: &Regex,
+        handler: F
+    ) -> ArcResult<()>
+    where
+        F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = ()> + Send + 'static
+    {
+        upgrade(&self.inner)?
+            .route_web_socket_regex(
+                regex.as_str(),
+                regex.as_str().contains("(?i)").then_some("i").unwrap_or(""),
+                Arc::new(move |route| {
+                    let route = WebSocketRoute::new(Arc::downgrade(&route), WebSocketRouteSide::Page);
+                    Box::pin(handler(route))
+                })
+            )
+            .await
+    }
+
+    pub async fn unroute_web_socket(&self, glob: Option<&str>) -> ArcResult<()> {
+        upgrade(&self.inner)?.unroute_web_socket(glob).await
+    }
 
     pub async fn expect_event(&self, evt: EventType) -> Result<Event, Error> {
         let stream = upgrade(&self.inner)?.subscribe_event();
@@ -219,7 +363,6 @@ impl BrowserContext {
     // service_workers
 }
 
-#[derive(Debug, PartialEq)]
 pub enum Event {
     // BackgroundPage for chromium persistent
     // ServiceWorker
@@ -242,14 +385,65 @@ pub enum Event {
     /// ]);
     /// console.log(await newPage.evaluate('location.href'));
     /// ```
-    Page(Page)
+    Page(Page),
+    /// Emitted when a request is routed via [`BrowserContext.route`].
+    Route(Route),
+    /// Emitted when a console message is logged in any page in the context.
+    Console(ConsoleMessage),
+    Request(Request),
+    RequestFailed(Request),
+    RequestFinished(Request),
+    Response(Response),
+    /// Emitted when an unhandled exception occurs in any page within the context.
+    WebError(WebError)
+}
+
+impl std::fmt::Debug for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Event::Close => write!(f, "Close"),
+            Event::Page(_) => write!(f, "Page(..)"),
+            Event::Route(_) => write!(f, "Route(..)"),
+            Event::Console(_) => write!(f, "Console(..)"),
+            Event::Request(_) => write!(f, "Request(..)"),
+            Event::RequestFailed(_) => write!(f, "RequestFailed(..)"),
+            Event::RequestFinished(_) => write!(f, "RequestFinished(..)"),
+            Event::Response(_) => write!(f, "Response(..)"),
+            Event::WebError(_) => write!(f, "WebError(..)")
+        }
+    }
+}
+
+impl PartialEq for Event {
+    fn eq(&self, other: &Self) -> bool {
+        use Event::*;
+        match (self, other) {
+            (Close, Close) => true,
+            (Page(_), Page(_)) => true,
+            (Route(_), Route(_)) => true,
+            (Console(_), Console(_)) => true,
+            (Request(_), Request(_)) => true,
+            (RequestFailed(_), RequestFailed(_)) => true,
+            (RequestFinished(_), RequestFinished(_)) => true,
+            (Response(_), Response(_)) => true,
+            (WebError(_), WebError(_)) => true,
+            _ => false
+        }
+    }
 }
 
 impl From<Evt> for Event {
     fn from(e: Evt) -> Event {
         match e {
             Evt::Close => Event::Close,
-            Evt::Page(w) => Event::Page(Page::new(w))
+            Evt::Page(w) => Event::Page(Page::new(w)),
+            Evt::Route(r) => Event::Route(Route::new(r)),
+            Evt::Console(c) => Event::Console(ConsoleMessage::new(c)),
+            Evt::Request(r) => Event::Request(Request::new(r)),
+            Evt::RequestFailed(r) => Event::RequestFailed(Request::new(r)),
+            Evt::RequestFinished(r) => Event::RequestFinished(Request::new(r)),
+            Evt::Response(r) => Event::Response(Response::new(r)),
+            Evt::WebError(e) => Event::WebError(WebError::new(e))
         }
     }
 }

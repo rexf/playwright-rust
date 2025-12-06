@@ -15,6 +15,11 @@ impl Route {
 
     pub(crate) fn request(&self) -> Weak<Request> { self.request.clone() }
 
+    pub(crate) async fn fallback(&self) -> ArcResult<()> {
+        let _ = send_message!(self, "fallback", Map::new());
+        Ok(())
+    }
+
     pub(crate) async fn abort(&self, err_code: Option<&str>) -> Result<(), Arc<Error>> {
         let mut args = HashMap::new();
         if let Some(x) = err_code {

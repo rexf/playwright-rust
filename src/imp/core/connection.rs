@@ -177,6 +177,22 @@ impl Connection {
         let ctx = &mut self.ctx.lock().unwrap();
         ctx.notify_closed(e);
     }
+
+    pub(crate) fn send_initialize(
+        &self,
+        params: Map<String, Value>
+    ) -> Result<WaitData<WaitMessageResult>, Error> {
+        let mut ctx = self.ctx.lock().unwrap();
+        let wait = WaitData::new();
+        let req = RequestBody::new(
+            Str::validate("".into()).unwrap(),
+            Str::validate("initialize".into()).unwrap()
+        )
+        .set_params(params)
+        .set_wait(&wait);
+        ctx.send_message(req)?;
+        Ok(wait)
+    }
 }
 
 impl Context {
@@ -226,7 +242,14 @@ impl Context {
                 }
                 let target = self.objects.get(&msg.guid).ok_or(Error::ObjectNotFound)?;
                 let ResInitial { method, params, .. } = msg;
-                target.handle_event(self, method, params)?;
+                if let Err(e) = target.handle_event(self, method.clone(), params) {
+                    log::error!(
+                        "handle_event error guid={} method={} err={:?}",
+                        target.channel().guid.as_str(),
+                        method.as_str(),
+                        e
+                    );
+                }
             }
         }
         Ok(())
@@ -279,16 +302,79 @@ impl Context {
             guid,
             initializer
         } = serde_json::from_value(params.into())?;
-        let parent = self.objects.get(parent).ok_or(Error::ObjectNotFound)?;
+        log::trace!(
+            "create_remote_object typ={} guid={} parent={}",
+            typ.as_str(),
+            guid.as_str(),
+            parent.as_str()
+        );
+        let parent_obj = self.objects.get(parent).ok_or(Error::ObjectNotFound)?;
         let c = ChannelOwner::new(
             self.ctx.clone(),
-            parent.downgrade(),
+            parent_obj.downgrade(),
             typ.to_owned(),
             guid.to_owned(),
             initializer
         );
-        let r = RemoteArc::try_new(&typ, self, c)?;
-        parent.channel().push_child(r.downgrade());
+        if typ.as_str().starts_with("Browser") {
+            log::trace!(
+                "create_remote_object raw bytes for {}: {:?}",
+                typ.as_str(),
+                typ.as_str().as_bytes()
+            );
+            log::trace!(
+                "create_remote_object {} contains \"Context\"? {}",
+                typ.as_str(),
+                typ.as_str().contains("Context")
+            );
+        }
+        let r = match RemoteArc::try_new(&typ, self, c) {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!(
+                    "create_remote_object failed typ={} guid={} err={:?}",
+                    typ.as_str(),
+                    guid.as_str(),
+                    e
+                );
+                return Err(e);
+            }
+        };
+        parent_obj.channel().push_child(r.downgrade());
+        // Keep the Browser's context list in sync when a new BrowserContext is created.
+        if typ.as_str().contains("Context") {
+            log::debug!("create_remote_object typ={}", typ.as_str());
+        }
+        let typ_trim = typ.as_str().trim();
+        let is_browser_ctx = typ_trim.eq_ignore_ascii_case("browsercontext");
+        if typ.as_str().starts_with("Browser") {
+            log::trace!("create_remote_object {} eq_ignore_ascii_case browsercontext -> {}", typ_trim, is_browser_ctx);
+        }
+        if is_browser_ctx {
+            log::warn!("BrowserContext branch reached for guid {}", guid.as_str());
+            let parent_kind = match parent_obj {
+                RemoteArc::Browser(_) => "Browser",
+                RemoteArc::BrowserType(_) => "BrowserType",
+                RemoteArc::Playwright(_) => "Playwright",
+                _ => "Other"
+            };
+            log::debug!(
+                "create_remote_object BrowserContext parent typ={}",
+                parent_kind
+            );
+            if let (RemoteArc::BrowserContext(bc), RemoteArc::Browser(browser)) = (&r, parent_obj)
+            {
+                log::debug!("register BrowserContext into Browser contexts list");
+                let weak = Arc::downgrade(bc);
+                browser.push_context(weak.clone());
+                // Wake any in-flight new_context call waiting for the __create__ event.
+                if let Some(tx) = browser.take_pending_context_sender() {
+                    let _ = tx.send(weak);
+                }
+            } else {
+                log::debug!("BrowserContext parent not Browser -> skip register");
+            }
+        }
         self.objects.insert(guid, r.clone());
         match r {
             RemoteArc::Page(p) => {
@@ -306,6 +392,10 @@ impl Context {
         self.objects.get(k).map(|r| r.downgrade())
     }
 
+    pub(in crate::imp) fn list_objects(&self) -> Vec<RemoteArc> {
+        self.objects.values().cloned().collect()
+    }
+
     pub(in crate::imp) fn remove_object(&mut self, k: &S<Guid>) { self.objects.remove(k); }
 
     pub(in crate::imp::core) fn send_message(&mut self, r: RequestBody) -> Result<(), Error> {
@@ -314,6 +404,7 @@ impl Context {
             guid,
             method,
             params,
+            metadata,
             place
         } = r;
         self.callbacks.insert(self.id, place);
@@ -321,6 +412,7 @@ impl Context {
             guid: &guid,
             method: &method,
             params,
+            metadata,
             id: self.id
         };
         self.writer.send(&req)?;

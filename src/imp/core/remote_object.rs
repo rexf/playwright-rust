@@ -1,4 +1,9 @@
-use crate::imp::{core::*, impl_future::*, prelude::*};
+use crate::imp::{
+    api_request_context::APIRequestContext,
+    core::*,
+    impl_future::*,
+    prelude::*
+};
 use serde_json::value::Value;
 use std::{fmt::Debug, future::Future, pin::Pin, sync::TryLockError, task::Waker};
 
@@ -136,11 +141,11 @@ mod remote_enum {
     use super::{DummyObject as Dummy, RootObject as Root, *};
     use crate::imp::{
         artifact::Artifact, binding_call::BindingCall, browser::Browser,
-        browser_context::BrowserContext, browser_type::BrowserType,
+        browser_context::BrowserContext, browser_type::BrowserType, cdp_session::CDPSession,
         console_message::ConsoleMessage, dialog::Dialog, element_handle::ElementHandle,
         frame::Frame, js_handle::JsHandle, page::Page, playwright::Playwright, request::Request,
-        response::Response, route::Route, selectors::Selectors, stream::Stream,
-        websocket::WebSocket, worker::Worker
+        response::Response, route::Route, selectors::Selectors, stream::Stream, tracing::Tracing,
+        websocket::WebSocket, websocket_route::WebSocketRoute, worker::Worker
     };
 
     macro_rules! upgrade {
@@ -228,7 +233,7 @@ mod remote_enum {
         Browser,
         BrowserContext,
         BrowserType,
-        // CdpSession
+        CDPSession,
         ConsoleMessage,
         Dialog,
         // Electron
@@ -238,12 +243,15 @@ mod remote_enum {
         JsHandle,
         Page,
         Playwright,
+        APIRequestContext,
         Request,
         Response,
         Route,
         Stream,
         Selectors,
+        Tracing,
         WebSocket,
+        WebSocketRoute,
         Worker
     }
 
@@ -261,6 +269,7 @@ mod remote_enum {
                     RemoteArc::BrowserContext(Arc::new(BrowserContext::try_new(c)?))
                 }
                 "BrowserType" => RemoteArc::BrowserType(Arc::new(BrowserType::try_new(c)?)),
+                "CDPSession" => RemoteArc::CDPSession(Arc::new(CDPSession::try_new(c)?)),
                 "ConsoleMessage" => {
                     RemoteArc::ConsoleMessage(Arc::new(ConsoleMessage::try_new(ctx, c)?))
                 }
@@ -270,12 +279,19 @@ mod remote_enum {
                 "JSHandle" => RemoteArc::JsHandle(Arc::new(JsHandle::try_new(c)?)),
                 "Page" => RemoteArc::Page(Arc::new(Page::try_new(ctx, c)?)),
                 "Playwright" => RemoteArc::Playwright(Arc::new(Playwright::try_new(ctx, c)?)),
+                "APIRequestContext" => {
+                    RemoteArc::APIRequestContext(Arc::new(APIRequestContext::try_new(ctx, c)?))
+                }
                 "Request" => RemoteArc::Request(Request::try_new(ctx, c)?),
                 "Response" => RemoteArc::Response(Arc::new(Response::try_new(ctx, c)?)),
                 "Route" => RemoteArc::Route(Arc::new(Route::try_new(ctx, c)?)),
                 "Stream" => RemoteArc::Stream(Arc::new(Stream::new(c))),
                 "Selectors" => RemoteArc::Selectors(Arc::new(Selectors::new(c))),
+                "Tracing" => RemoteArc::Tracing(Arc::new(Tracing::try_new(c)?)),
                 "WebSocket" => RemoteArc::WebSocket(Arc::new(WebSocket::try_new(c)?)),
+                "WebSocketRoute" => {
+                    RemoteArc::WebSocketRoute(Arc::new(WebSocketRoute::try_new(c)?))
+                }
                 "Worker" => RemoteArc::Worker(Arc::new(Worker::try_new(c)?)),
                 _ => RemoteArc::Dummy(Arc::new(DummyObject::new(c)))
             };
@@ -290,6 +306,7 @@ pub(crate) struct RequestBody {
     pub(crate) guid: Str<Guid>,
     pub(crate) method: Str<Method>,
     pub(crate) params: Map<String, Value>,
+    pub(crate) metadata: Map<String, Value>,
     pub(crate) place: WaitPlaces<WaitMessageResult>
 }
 
@@ -299,6 +316,7 @@ impl RequestBody {
             guid,
             method,
             params: Map::default(),
+            metadata: Map::default(),
             place: WaitPlaces::new_empty()
         }
     }
