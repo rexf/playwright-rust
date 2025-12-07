@@ -6,7 +6,7 @@ use crate::imp::{
     page::Page,
     prelude::*,
     response::Response,
-    utils::{DocumentLoadState, File, KeyboardModifier, MouseButton, Position}
+    utils::{DocumentLoadState, File, KeyboardModifier, MouseButton, Position},
 };
 use std::{collections::HashSet, iter::FromIterator};
 
@@ -15,7 +15,7 @@ pub(crate) struct Frame {
     channel: ChannelOwner,
     parent_frame: Option<Weak<Frame>>,
     var: Mutex<Variable>,
-    tx: Mutex<Option<broadcast::Sender<Evt>>>
+    tx: Mutex<Option<broadcast::Sender<Evt>>>,
 }
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ struct Variable {
     name: String,
     page: Option<Weak<Page>>,
     child_frames: Vec<Weak<Frame>>,
-    load_states: HashSet<DocumentLoadState>
+    load_states: HashSet<DocumentLoadState>,
 }
 
 macro_rules! is_checked {
@@ -35,7 +35,7 @@ macro_rules! is_checked {
             #[serde(rename_all = "camelCase")]
             struct Args<'a> {
                 selector: &'a str,
-                timeout: Option<f64>
+                timeout: Option<f64>,
             }
             let args = Args { selector, timeout };
             let v = send_message!(self, $m, args);
@@ -52,11 +52,11 @@ macro_rules! eval_handle {
     ($name:ident, $variant:ident, $t:ty) => {
         pub(crate) async fn $name<T>(&self, expression: &str, arg: Option<T>) -> ArcResult<Weak<$t>>
         where
-            T: Serialize
+            T: Serialize,
         {
             let handle = match self.evaluate_handle(expression, arg).await? {
                 Handle::$variant(handle) => handle,
-                _ => return Err(Error::ObjectNotFound.into())
+                _ => return Err(Error::ObjectNotFound.into()),
             };
             Ok(handle)
         }
@@ -69,26 +69,26 @@ impl Frame {
             name,
             url,
             parent_frame,
-            load_states
+            load_states,
         } = serde_json::from_value(channel.initializer.clone())?;
         let parent_frame =
             match parent_frame.map(|OnlyGuid { guid }| get_object!(ctx, &guid, Frame)) {
                 Some(Err(e)) => return Err(e),
                 Some(Ok(x)) => Some(x),
-                None => None
+                None => None,
             };
         let var = Mutex::new(Variable {
             url,
             name,
             page: None,
             child_frames: Vec::new(),
-            load_states: HashSet::from_iter(load_states)
+            load_states: HashSet::from_iter(load_states),
         });
         Ok(Self {
             channel,
             parent_frame,
             var,
-            tx: Mutex::default()
+            tx: Mutex::default(),
         })
     }
 
@@ -103,7 +103,7 @@ impl Frame {
         let v = send_message!(self, "goto", args);
         let guid = match as_only_guid(&v) {
             Some(g) => g,
-            None => return Ok(None)
+            None => return Ok(None),
         };
         let r = get_object!(self.context()?.lock().unwrap(), guid, Response)?;
         Ok(Some(r))
@@ -138,7 +138,7 @@ impl Frame {
     pub(crate) async fn text_content(
         &self,
         selector: &str,
-        timeout: Option<f64>
+        timeout: Option<f64>,
     ) -> ArcResult<Option<String>> {
         let args = SelectorTimeout { selector, timeout };
         let v = send_message!(self, "textContent", args);
@@ -149,7 +149,7 @@ impl Frame {
     pub(crate) async fn inner_text(
         &self,
         selector: &str,
-        timeout: Option<f64>
+        timeout: Option<f64>,
     ) -> ArcResult<String> {
         let args = SelectorTimeout { selector, timeout };
         let v = send_message!(self, "innerText", args);
@@ -160,7 +160,7 @@ impl Frame {
     pub(crate) async fn inner_html(
         &self,
         selector: &str,
-        timeout: Option<f64>
+        timeout: Option<f64>,
     ) -> ArcResult<String> {
         let args = SelectorTimeout { selector, timeout };
         let v = send_message!(self, "innerHTML", args);
@@ -172,7 +172,7 @@ impl Frame {
         &self,
         selector: &str,
         name: &str,
-        timeout: Option<f64>
+        timeout: Option<f64>,
     ) -> ArcResult<Option<String>> {
         #[skip_serializing_none]
         #[derive(Serialize)]
@@ -180,12 +180,12 @@ impl Frame {
         struct Args<'a, 'b> {
             selector: &'a str,
             name: &'b str,
-            timeout: Option<f64>
+            timeout: Option<f64>,
         }
         let args = Args {
             selector,
             name,
-            timeout
+            timeout,
         };
         let v = send_message!(self, "getAttribute", args);
         let s = maybe_only_str(&v)?;
@@ -194,14 +194,14 @@ impl Frame {
 
     pub(crate) async fn query_selector(
         &self,
-        selector: &str
+        selector: &str,
     ) -> ArcResult<Option<Weak<ElementHandle>>> {
         let mut args = HashMap::new();
         args.insert("selector", selector);
         let v = send_message!(self, "querySelector", args);
         let guid = match as_only_guid(&v) {
             Some(g) => g,
-            None => return Ok(None)
+            None => return Ok(None),
         };
         let e = get_object!(self.context()?.lock().unwrap(), guid, ElementHandle)?;
         Ok(Some(e))
@@ -209,7 +209,7 @@ impl Frame {
 
     pub(crate) async fn query_selector_all(
         &self,
-        selector: &str
+        selector: &str,
     ) -> ArcResult<Vec<Weak<ElementHandle>>> {
         let mut args = HashMap::new();
         args.insert("selector", selector);
@@ -235,12 +235,12 @@ impl Frame {
 
     pub(crate) async fn wait_for_selector(
         &self,
-        args: WaitForSelectorArgs<'_>
+        args: WaitForSelectorArgs<'_>,
     ) -> ArcResult<Option<Weak<ElementHandle>>> {
         let v = send_message!(self, "waitForSelector", args);
         let guid = match as_only_guid(&v) {
             Some(g) => g,
-            None => return Ok(None)
+            None => return Ok(None),
         };
         let e = get_object!(self.context()?.lock().unwrap(), guid, ElementHandle)?;
         Ok(Some(e))
@@ -297,7 +297,7 @@ impl Frame {
 
     pub(crate) async fn add_script_tag(
         &self,
-        args: AddScriptTagArgs<'_, '_, '_>
+        args: AddScriptTagArgs<'_, '_, '_>,
     ) -> ArcResult<Weak<ElementHandle>> {
         let v = send_message!(self, "addScriptTag", args);
         let guid = only_guid(&v)?;
@@ -308,7 +308,7 @@ impl Frame {
     pub(crate) async fn add_style_tag(
         &self,
         content: &str,
-        url: Option<&str>
+        url: Option<&str>,
     ) -> ArcResult<Weak<ElementHandle>> {
         let mut args = HashMap::new();
         args.insert("content", content);
@@ -323,7 +323,7 @@ impl Frame {
 
     pub(crate) async fn eval<U>(&self, expression: &str) -> ArcResult<U>
     where
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         self.evaluate::<(), U>(expression, None).await
     }
@@ -331,13 +331,13 @@ impl Frame {
     pub(crate) async fn evaluate<T, U>(&self, expression: &str, arg: Option<T>) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
             expression: &'a str,
-            arg: Value
+            arg: Value,
         }
         let arg = ser::to_value(&arg).map_err(Error::SerializationPwJson)?;
         let args = Args { expression, arg };
@@ -348,13 +348,13 @@ impl Frame {
 
     async fn evaluate_handle<T>(&self, expression: &str, arg: Option<T>) -> ArcResult<Handle>
     where
-        T: Serialize
+        T: Serialize,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
             expression: &'a str,
-            arg: Value
+            arg: Value,
         }
         let arg = ser::to_value(&arg).map_err(Error::SerializationPwJson)?;
         let args = Args { expression, arg };
@@ -377,24 +377,24 @@ impl Frame {
         &self,
         selector: &str,
         expression: &str,
-        arg: Option<T>
+        arg: Option<T>,
     ) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a, 'b> {
             selector: &'a str,
             expression: &'b str,
-            arg: Value
+            arg: Value,
         }
         let arg = ser::to_value(&arg).map_err(Error::SerializationPwJson)?;
         let args = Args {
             selector,
             expression,
-            arg
+            arg,
         };
         let v = send_message!(self, "evalOnSelector", args);
         let first = first(&v).ok_or(Error::ObjectNotFound)?;
@@ -405,24 +405,24 @@ impl Frame {
         &self,
         selector: &str,
         expression: &str,
-        arg: Option<T>
+        arg: Option<T>,
     ) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a, 'b> {
             selector: &'a str,
             expression: &'b str,
-            arg: Value
+            arg: Value,
         }
         let arg = ser::to_value(&arg).map_err(Error::SerializationPwJson)?;
         let args = Args {
             selector,
             expression,
-            arg
+            arg,
         };
         let v = send_message!(self, "evalOnSelectorAll", args);
         let first = first(&v).ok_or(Error::ObjectNotFound)?;
@@ -433,23 +433,23 @@ impl Frame {
         &self,
         selector: &str,
         r#type: &str,
-        event_init: Option<T>
+        event_init: Option<T>,
     ) -> ArcResult<()>
     where
-        T: Serialize
+        T: Serialize,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a, 'b> {
             selector: &'a str,
             r#type: &'b str,
-            event_init: Value
+            event_init: Value,
         }
         let event_init = ser::to_value(&event_init).map_err(Error::SerializationPwJson)?;
         let args = Args {
             selector,
             r#type,
-            event_init
+            event_init,
         };
         let _ = send_message!(self, "dispatchEvent", args);
         Ok(())
@@ -475,26 +475,76 @@ impl Frame {
 
     pub(crate) async fn wait_for_function(
         &self,
-        args: WaitForFunctionArgs<'_>
+        args: WaitForFunctionArgs<'_>,
     ) -> ArcResult<Weak<JsHandle>> {
         let v = send_message!(self, "waitForFunction", args);
         let guid = only_guid(&v)?;
         let h = get_object!(self.context()?.lock().unwrap(), guid, JsHandle)?;
         Ok(h)
     }
+
+    pub(crate) async fn wait_for_load_state(
+        &self,
+        state: Option<DocumentLoadState>,
+        timeout: Option<f64>,
+    ) -> ArcResult<()> {
+        #[skip_serializing_none]
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args {
+            state: Option<DocumentLoadState>,
+            timeout: Option<f64>,
+        }
+        let args = Args { state, timeout };
+        let _ = send_message!(self, "waitForLoadState", args);
+        Ok(())
+    }
+
+    pub(crate) async fn wait_for_url(
+        &self,
+        url: &str,
+        wait_until: Option<DocumentLoadState>,
+        timeout: Option<f64>,
+    ) -> ArcResult<()> {
+        #[skip_serializing_none]
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Args<'a> {
+            url: &'a str,
+            wait_until: Option<DocumentLoadState>,
+            timeout: Option<f64>,
+        }
+        let args = Args {
+            url,
+            wait_until,
+            timeout,
+        };
+        let _ = send_message!(self, "waitForURL", args);
+        Ok(())
+    }
 }
 
 // mutable
 impl Frame {
-    pub(crate) fn url(&self) -> String { self.var.lock().unwrap().url.clone() }
+    pub(crate) fn url(&self) -> String {
+        self.var.lock().unwrap().url.clone()
+    }
 
-    pub(crate) fn name(&self) -> String { self.var.lock().unwrap().name.clone() }
+    pub(crate) fn name(&self) -> String {
+        self.var.lock().unwrap().name.clone()
+    }
 
-    pub(crate) fn page(&self) -> Option<Weak<Page>> { self.var.lock().unwrap().page.clone() }
+    pub(crate) fn page(&self) -> Option<Weak<Page>> {
+        self.var.lock().unwrap().page.clone()
+    }
 
-    pub(crate) fn set_page(&self, page: Weak<Page>) { self.var.lock().unwrap().page = Some(page); }
+    pub(crate) fn set_page(&self, page: Weak<Page>) {
+        self.var.lock().unwrap().page = Some(page);
+    }
 
-    pub(crate) fn parent_frame(&self) -> Option<Weak<Frame>> { self.parent_frame.clone() }
+    pub(crate) fn parent_frame(&self) -> Option<Weak<Frame>> {
+        self.parent_frame.clone()
+    }
 
     pub(crate) fn child_frames(&self) -> Vec<Weak<Frame>> {
         self.var.lock().unwrap().child_frames.clone()
@@ -524,7 +574,7 @@ impl Frame {
         #[serde(rename_all = "camelCase")]
         enum Op {
             Add(DocumentLoadState),
-            Remove(DocumentLoadState)
+            Remove(DocumentLoadState),
         }
         let op: Op = serde_json::from_value(params.into())?;
         let load_states = &mut self.var.lock().unwrap().load_states;
@@ -542,14 +592,18 @@ impl Frame {
 }
 
 impl RemoteObject for Frame {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 
     fn handle_event(
         &self,
         ctx: &Context,
         method: Str<Method>,
-        params: Map<String, Value>
+        params: Map<String, Value>,
     ) -> Result<(), Error> {
         match method.as_str() {
             "navigated" => self.on_navigated(ctx, params)?,
@@ -563,21 +617,25 @@ impl RemoteObject for Frame {
 #[derive(Debug, Clone)]
 pub(crate) enum Evt {
     LoadState(DocumentLoadState),
-    Navigated(FrameNavigatedEvent)
+    Navigated(FrameNavigatedEvent),
 }
 
 impl EventEmitter for Frame {
     type Event = Evt;
 
-    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> { self.tx.lock().unwrap().clone() }
+    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> {
+        self.tx.lock().unwrap().clone()
+    }
 
-    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) { *self.tx.lock().unwrap() = Some(tx); }
+    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) {
+        *self.tx.lock().unwrap() = Some(tx);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EventType {
     LoadState,
-    Navigated
+    Navigated,
 }
 
 impl IsEvent for Evt {
@@ -586,14 +644,14 @@ impl IsEvent for Evt {
     fn event_type(&self) -> Self::EventType {
         match self {
             Evt::LoadState(_) => EventType::LoadState,
-            Evt::Navigated(_) => EventType::Navigated
+            Evt::Navigated(_) => EventType::Navigated,
         }
     }
 }
 
 enum Handle {
     Js(Weak<JsHandle>),
-    Element(Weak<ElementHandle>)
+    Element(Weak<ElementHandle>),
 }
 
 #[skip_serializing_none]
@@ -604,7 +662,7 @@ pub(crate) struct GotoArgs<'a, 'b> {
     url: &'a str,
     pub(crate) timeout: Option<f64>,
     pub(crate) wait_until: Option<DocumentLoadState>,
-    pub(crate) referer: Option<&'b str>
+    pub(crate) referer: Option<&'b str>,
 }
 
 impl<'a> GotoArgs<'a, '_> {
@@ -613,7 +671,7 @@ impl<'a> GotoArgs<'a, '_> {
             url,
             timeout: Some(30000.0),
             wait_until: None,
-            referer: None
+            referer: None,
         }
     }
 }
@@ -632,7 +690,7 @@ pub(crate) struct ClickArgs<'a> {
     pub(crate) timeout: Option<f64>,
     pub(crate) force: Option<bool>,
     pub(crate) no_wait_after: Option<bool>,
-    pub(crate) trial: Option<bool>
+    pub(crate) trial: Option<bool>,
 }
 
 impl<'a> ClickArgs<'a> {
@@ -648,7 +706,7 @@ impl<'a> ClickArgs<'a> {
             timeout: None,
             force: None,
             no_wait_after: None,
-            trial: None
+            trial: None,
         }
     }
 }
@@ -659,7 +717,7 @@ impl<'a> ClickArgs<'a> {
 pub(crate) struct WaitForSelectorArgs<'a> {
     selector: &'a str,
     pub(crate) timeout: Option<f64>,
-    pub(crate) state: Option<FrameState>
+    pub(crate) state: Option<FrameState>,
 }
 
 impl<'a> WaitForSelectorArgs<'a> {
@@ -667,7 +725,7 @@ impl<'a> WaitForSelectorArgs<'a> {
         Self {
             selector,
             timeout: None,
-            state: None
+            state: None,
         }
     }
 }
@@ -678,11 +736,12 @@ pub enum FrameState {
     Attached,
     Detached,
     Hidden,
-    Visible
+    Visible,
 }
 
 macro_rules! type_args {
     ($t:ident, $f:ident) => {
+        #[skip_serializing_none]
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         pub(crate) struct $t<'a, 'b> {
@@ -690,7 +749,7 @@ macro_rules! type_args {
             $f: &'b str,
             pub(crate) delay: Option<f64>,
             pub(crate) timeout: Option<f64>,
-            pub(crate) no_wait_after: Option<bool>
+            pub(crate) no_wait_after: Option<bool>,
         }
 
         impl<'a, 'b> $t<'a, 'b> {
@@ -700,7 +759,7 @@ macro_rules! type_args {
                     $f,
                     delay: None,
                     timeout: None,
-                    no_wait_after: None
+                    no_wait_after: None,
                 }
             }
         }
@@ -719,7 +778,7 @@ pub(crate) struct HoverArgs<'a> {
     pub(crate) position: Option<Position>,
     pub(crate) timeout: Option<f64>,
     pub(crate) force: Option<bool>,
-    pub(crate) trial: Option<bool>
+    pub(crate) trial: Option<bool>,
 }
 
 impl<'a> HoverArgs<'a> {
@@ -730,7 +789,7 @@ impl<'a> HoverArgs<'a> {
             position: None,
             timeout: None,
             force: None,
-            trial: None
+            trial: None,
         }
     }
 }
@@ -741,7 +800,7 @@ impl<'a> HoverArgs<'a> {
 pub(crate) struct SetContentArgs<'a> {
     html: &'a str,
     pub(crate) timeout: Option<f64>,
-    pub(crate) wait_until: Option<DocumentLoadState>
+    pub(crate) wait_until: Option<DocumentLoadState>,
 }
 
 impl<'a> SetContentArgs<'a> {
@@ -749,7 +808,7 @@ impl<'a> SetContentArgs<'a> {
         Self {
             html,
             timeout: None,
-            wait_until: None
+            wait_until: None,
         }
     }
 }
@@ -764,7 +823,7 @@ pub(crate) struct TapArgs<'a> {
     pub(crate) timeout: Option<f64>,
     pub(crate) force: Option<bool>,
     pub(crate) no_wait_after: Option<bool>,
-    pub(crate) trial: Option<bool>
+    pub(crate) trial: Option<bool>,
 }
 
 impl<'a> TapArgs<'a> {
@@ -776,7 +835,7 @@ impl<'a> TapArgs<'a> {
             timeout: None,
             force: None,
             no_wait_after: None,
-            trial: None
+            trial: None,
         }
     }
 }
@@ -788,7 +847,7 @@ pub(crate) struct FillArgs<'a, 'b> {
     selector: &'a str,
     value: &'b str,
     pub(crate) timeout: Option<f64>,
-    pub(crate) no_wait_after: Option<bool>
+    pub(crate) no_wait_after: Option<bool>,
 }
 
 impl<'a, 'b> FillArgs<'a, 'b> {
@@ -797,7 +856,7 @@ impl<'a, 'b> FillArgs<'a, 'b> {
             selector,
             value,
             timeout: None,
-            no_wait_after: None
+            no_wait_after: None,
         }
     }
 }
@@ -807,7 +866,7 @@ impl<'a, 'b> FillArgs<'a, 'b> {
 #[serde(rename_all = "camelCase")]
 struct SelectorTimeout<'a> {
     selector: &'a str,
-    timeout: Option<f64>
+    timeout: Option<f64>,
 }
 
 #[skip_serializing_none]
@@ -819,7 +878,7 @@ pub(crate) struct CheckArgs<'a> {
     pub(crate) timeout: Option<f64>,
     pub(crate) force: Option<bool>,
     pub(crate) no_wait_after: Option<bool>,
-    pub(crate) trial: Option<bool>
+    pub(crate) trial: Option<bool>,
 }
 
 impl<'a> CheckArgs<'a> {
@@ -830,7 +889,7 @@ impl<'a> CheckArgs<'a> {
             timeout: None,
             force: None,
             no_wait_after: None,
-            trial: None
+            trial: None,
         }
     }
 }
@@ -841,7 +900,9 @@ impl<'a> CheckArgs<'a> {
 pub(crate) struct AddScriptTagArgs<'a, 'b, 'c> {
     content: &'a str,
     pub(crate) url: Option<&'b str>,
-    pub(crate) r#type: Option<&'c str>
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) path: Option<String>,
+    pub(crate) r#type: Option<&'c str>,
 }
 
 impl<'a, 'b, 'c> AddScriptTagArgs<'a, 'b, 'c> {
@@ -849,7 +910,8 @@ impl<'a, 'b, 'c> AddScriptTagArgs<'a, 'b, 'c> {
         Self {
             content,
             url: None,
-            r#type: None
+            path: None,
+            r#type: None,
         }
     }
 }
@@ -864,7 +926,7 @@ pub(crate) struct SelectOptionArgs<'a> {
     pub(crate) elements: Option<Vec<OnlyGuid>>,
 
     pub(crate) timeout: Option<f64>,
-    pub(crate) no_wait_after: Option<bool>
+    pub(crate) no_wait_after: Option<bool>,
 }
 
 impl<'a> SelectOptionArgs<'a> {
@@ -874,7 +936,7 @@ impl<'a> SelectOptionArgs<'a> {
             options: None,
             elements: None,
             timeout: None,
-            no_wait_after: None
+            no_wait_after: None,
         }
     }
 }
@@ -887,7 +949,7 @@ pub(crate) struct SetInputFilesArgs<'a> {
 
     pub(crate) files: Vec<File>,
     pub(crate) timeout: Option<f64>,
-    pub(crate) no_wait_after: Option<bool>
+    pub(crate) no_wait_after: Option<bool>,
 }
 
 impl<'a> SetInputFilesArgs<'a> {
@@ -896,7 +958,7 @@ impl<'a> SetInputFilesArgs<'a> {
             selector,
             files: Vec::new(),
             timeout: None,
-            no_wait_after: None
+            no_wait_after: None,
         }
     }
 }
@@ -909,22 +971,22 @@ pub(crate) struct WaitForFunctionArgs<'a> {
     pub(crate) timeout: Option<f64>,
     pub(crate) polling: Option<Polling>,
     // XXX
-    pub(crate) arg: Option<Value>
+    pub(crate) arg: Option<Value>,
 }
 
 pub enum Polling {
     RequestAnimationFrame,
-    Millis(u32)
+    Millis(u32),
 }
 
 impl Serialize for Polling {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::ser::Serializer
+        S: serde::ser::Serializer,
     {
         match self {
             Self::Millis(x) => x.serialize(serializer),
-            Self::RequestAnimationFrame => "raf".serialize(serializer)
+            Self::RequestAnimationFrame => "raf".serialize(serializer),
         }
     }
 }
@@ -935,7 +997,7 @@ impl<'a> WaitForFunctionArgs<'a> {
             expression,
             timeout: None,
             polling: None,
-            arg: None
+            arg: None,
         }
     }
 }
@@ -946,7 +1008,7 @@ struct Initializer {
     name: String,
     url: String,
     parent_frame: Option<OnlyGuid>,
-    load_states: Vec<DocumentLoadState>
+    load_states: Vec<DocumentLoadState>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -955,14 +1017,14 @@ pub struct FrameNavigatedEvent {
     url: String,
     name: String,
     new_document: Option<Document>,
-    error: Option<String>
+    error: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Document {
     #[serde(default)]
-    request: Value
+    request: Value,
 }
 
 #[cfg(test)]
@@ -973,7 +1035,7 @@ mod tests {
         browser_context::BrowserContext,
         browser_type::*,
         page::Page,
-        playwright::Playwright
+        playwright::Playwright,
     };
 
     crate::runtime_test!(eval_handle, {

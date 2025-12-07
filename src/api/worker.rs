@@ -3,8 +3,8 @@ use crate::{
     imp::{
         core::*,
         prelude::*,
-        worker::{Evt, Worker as Impl}
-    }
+        worker::{Evt, Worker as Impl},
+    },
 };
 
 /// The Worker class represents a [WebWorker](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API). `worker`
@@ -23,7 +23,7 @@ use crate::{
 /// ```
 #[derive(Clone)]
 pub struct Worker {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for Worker {
@@ -37,9 +37,13 @@ impl PartialEq for Worker {
 }
 
 impl Worker {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
-    pub fn url(&self) -> Result<String, Error> { Ok(upgrade(&self.inner)?.url().to_owned()) }
+    pub fn url(&self) -> Result<String, Error> {
+        Ok(upgrade(&self.inner)?.url().to_owned())
+    }
 
     pub async fn eval_handle(&self, expression: &str) -> ArcResult<JsHandle> {
         upgrade(&self.inner)?
@@ -50,7 +54,7 @@ impl Worker {
 
     pub async fn evaluate_handle<T>(&self, expression: &str, arg: Option<T>) -> ArcResult<JsHandle>
     where
-        T: Serialize
+        T: Serialize,
     {
         upgrade(&self.inner)?
             .evaluate_handle(expression, arg)
@@ -60,7 +64,7 @@ impl Worker {
 
     pub async fn eval<U>(&self, expression: &str) -> ArcResult<U>
     where
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         upgrade(&self.inner)?.eval(expression).await
     }
@@ -68,7 +72,7 @@ impl Worker {
     pub async fn evaluate<T, U>(&self, expression: &str, arg: Option<T>) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         upgrade(&self.inner)?.evaluate(expression, arg).await
     }
@@ -78,13 +82,13 @@ impl Worker {
 
 #[derive(Debug)]
 pub enum Event {
-    Close
+    Close,
 }
 
 impl From<Evt> for Event {
     fn from(e: Evt) -> Self {
         match e {
-            Evt::Close => Self::Close
+            Evt::Close => Self::Close,
         }
     }
 }

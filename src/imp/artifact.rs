@@ -4,12 +4,12 @@ use crate::imp::{core::*, prelude::*};
 pub(crate) struct Artifact {
     channel: ChannelOwner,
     pub(crate) absolute_path: String,
-    var: Mutex<Variable>
+    var: Mutex<Variable>,
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Variable {
-    is_remote: bool
+    is_remote: bool,
 }
 
 impl Artifact {
@@ -18,7 +18,7 @@ impl Artifact {
         Ok(Self {
             channel,
             absolute_path,
-            var: Mutex::default()
+            var: Mutex::default(),
         })
     }
 
@@ -58,18 +58,26 @@ impl Artifact {
 
 // mutable
 impl Artifact {
-    fn set_is_remote(&self, x: bool) { self.var.lock().unwrap().is_remote = x; }
+    fn set_is_remote(&self, x: bool) {
+        self.var.lock().unwrap().is_remote = x;
+    }
 
-    fn is_remote(&self) -> bool { self.var.lock().unwrap().is_remote }
+    fn is_remote(&self) -> bool {
+        self.var.lock().unwrap().is_remote
+    }
 }
 
 impl RemoteObject for Artifact {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Initializer {
-    absolute_path: String
+    absolute_path: String,
 }

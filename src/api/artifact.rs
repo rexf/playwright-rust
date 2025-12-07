@@ -4,7 +4,7 @@ use std::path::Path;
 /// Artifact represents a file produced by Playwright (e.g. traces, videos, HARs).
 #[derive(Clone)]
 pub struct Artifact {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for Artifact {
@@ -18,7 +18,9 @@ impl PartialEq for Artifact {
 }
 
 impl Artifact {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     /// Path on disk once the artifact is finished. Returns `None` for remote artifacts.
     pub async fn path_after_finished(&self) -> ArcResult<Option<std::path::PathBuf>> {
@@ -31,7 +33,9 @@ impl Artifact {
     }
 
     /// Delete the artifact file.
-    pub async fn delete(&self) -> ArcResult<()> { upgrade(&self.inner)?.delete().await }
+    pub async fn delete(&self) -> ArcResult<()> {
+        upgrade(&self.inner)?.delete().await
+    }
 
     /// If artifact creation failed, returns an error string.
     pub async fn failure(&self) -> ArcResult<Option<String>> {

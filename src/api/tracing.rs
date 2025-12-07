@@ -3,12 +3,12 @@ use std::path::Path;
 use crate::imp::{
     core::*,
     prelude::*,
-    tracing::{StartArgs, StartChunkArgs, Tracing as Impl}
+    tracing::{StartArgs, StartChunkArgs, Tracing as Impl},
 };
 
 #[derive(Clone)]
 pub struct Tracing {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for Tracing {
@@ -22,7 +22,9 @@ impl PartialEq for Tracing {
 }
 
 impl Tracing {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     pub async fn start(&self, options: StartOptions<'_, '_>) -> ArcResult<()> {
         upgrade(&self.inner)?.start(options.into()).await
@@ -56,7 +58,7 @@ pub struct StartOptions<'a, 'b> {
     pub title: Option<&'b str>,
     pub screenshots: Option<bool>,
     pub snapshots: Option<bool>,
-    pub sources: Option<bool>
+    pub sources: Option<bool>,
 }
 
 impl<'a, 'b> From<StartOptions<'a, 'b>> for StartArgs<'a, 'b> {
@@ -66,15 +68,15 @@ impl<'a, 'b> From<StartOptions<'a, 'b>> for StartArgs<'a, 'b> {
             title,
             screenshots,
             snapshots,
-            sources
-        }: StartOptions<'a, 'b>
+            sources,
+        }: StartOptions<'a, 'b>,
     ) -> Self {
         StartArgs {
             name,
             title,
             screenshots,
             snapshots,
-            sources
+            sources,
         }
     }
 }
@@ -82,7 +84,7 @@ impl<'a, 'b> From<StartOptions<'a, 'b>> for StartArgs<'a, 'b> {
 #[derive(Default)]
 pub struct StartChunkOptions<'a, 'b> {
     pub name: Option<&'a str>,
-    pub title: Option<&'b str>
+    pub title: Option<&'b str>,
 }
 
 impl<'a, 'b> From<StartChunkOptions<'a, 'b>> for StartChunkArgs<'a, 'b> {
@@ -93,10 +95,10 @@ impl<'a, 'b> From<StartChunkOptions<'a, 'b>> for StartChunkArgs<'a, 'b> {
 
 #[derive(Default)]
 pub struct StopOptions<'a> {
-    pub path: Option<&'a Path>
+    pub path: Option<&'a Path>,
 }
 
 #[derive(Default)]
 pub struct StopChunkOptions<'a> {
-    pub path: Option<&'a Path>
+    pub path: Option<&'a Path>,
 }

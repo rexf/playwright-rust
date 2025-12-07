@@ -7,14 +7,14 @@ use crate::{
         core::*,
         playwright::DeviceDescriptor,
         prelude::*,
-        utils::{ColorScheme, Geolocation, HttpCredentials, ProxySettings, StorageState, Viewport}
+        utils::{ColorScheme, Geolocation, HttpCredentials, ProxySettings, StorageState, Viewport},
     },
-    Error
+    Error,
 };
 
 #[derive(Debug)]
 pub struct Browser {
-    inner: Weak<imp::browser::Browser>
+    inner: Weak<imp::browser::Browser>,
 }
 
 impl PartialEq for Browser {
@@ -28,7 +28,9 @@ impl PartialEq for Browser {
 }
 
 impl Browser {
-    pub(crate) fn new(inner: Weak<imp::browser::Browser>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<imp::browser::Browser>) -> Self {
+        Self { inner }
+    }
 
     /// Returns an array of all open browser contexts. In a newly created browser, this will return zero browser contexts.
     ///
@@ -53,7 +55,9 @@ impl Browser {
         Ok(upgrade(&self.inner)?.version().to_owned())
     }
 
-    pub fn exists(&self) -> bool { self.inner.upgrade().is_some() }
+    pub fn exists(&self) -> bool {
+        self.inner.upgrade().is_some()
+    }
 
     /// new_context [`BrowserContext`]
     /// Creates a new browser context. It won't share cookies/cache with other browser contexts.
@@ -66,7 +70,7 @@ impl Browser {
     pub async fn close(&self) -> Result<(), Arc<Error>> {
         let inner = match self.inner.upgrade() {
             None => return Ok(()),
-            Some(inner) => inner
+            Some(inner) => inner,
         };
         inner.close().await
     }
@@ -77,7 +81,7 @@ impl Browser {
     pub async fn start_tracing(
         &self,
         page: Option<&Page>,
-        options: StartTracingOptions<'_>
+        options: StartTracingOptions<'_>,
     ) -> ArcResult<()> {
         let inner = upgrade(&self.inner)?;
         let page = page
@@ -85,12 +89,12 @@ impl Browser {
             .map(|p| p.guid().to_owned());
         inner
             .start_tracing(imp::browser::StartTracingArgs {
-            page,
-            path: options.path,
-            screenshots: options.screenshots,
-            categories: options.categories.map(|v| v.iter().map(|s| *s).collect())
-        })
-        .await
+                page,
+                path: options.path,
+                screenshots: options.screenshots,
+                categories: options.categories.map(|v| v.iter().map(|s| *s).collect()),
+            })
+            .await
     }
 
     /// Stop tracing and return the resulting trace artifact (zip). Save it with [`Artifact::save_as`].
@@ -108,13 +112,13 @@ impl Browser {
 pub struct StartTracingOptions<'a> {
     pub path: Option<&'a str>,
     pub screenshots: Option<bool>,
-    pub categories: Option<&'a [&'a str]>
+    pub categories: Option<&'a [&'a str]>,
 }
 
 /// [`Browser::context_builder`]
 pub struct ContextBuilder<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
     inner: Weak<imp::browser::Browser>,
-    args: NewContextArgs<'e, 'f, 'g, 'h, 'i, 'j, 'k>
+    args: NewContextArgs<'e, 'f, 'g, 'h, 'i, 'j, 'k>,
 }
 
 impl<'e, 'f, 'g, 'h, 'i, 'j, 'k> ContextBuilder<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
@@ -127,7 +131,7 @@ impl<'e, 'f, 'g, 'h, 'i, 'j, 'k> ContextBuilder<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
     fn new(inner: Weak<imp::browser::Browser>) -> Self {
         Self {
             inner,
-            args: NewContextArgs::default()
+            args: NewContextArgs::default(),
         }
     }
 

@@ -1,9 +1,4 @@
-use crate::imp::{
-    api_request_context::APIRequestContext,
-    core::*,
-    impl_future::*,
-    prelude::*
-};
+use crate::imp::{api_request_context::APIRequestContext, core::*, impl_future::*, prelude::*};
 use serde_json::value::Value;
 use std::{fmt::Debug, future::Future, pin::Pin, sync::TryLockError, task::Waker};
 
@@ -13,11 +8,11 @@ pub(crate) fn upgrade<T>(w: &Weak<T>) -> Result<Arc<T>, Error> {
 
 pub(crate) fn weak_and_then<T, U, F>(w: &Weak<T>, f: F) -> Weak<U>
 where
-    F: FnOnce(Arc<T>) -> Weak<U>
+    F: FnOnce(Arc<T>) -> Weak<U>,
 {
     let rc = match w.upgrade() {
         None => return Weak::new(),
-        Some(rc) => rc
+        Some(rc) => rc,
     };
     f(rc)
 }
@@ -29,7 +24,7 @@ pub(crate) struct ChannelOwner {
     pub(crate) typ: Str<ObjectType>,
     pub(crate) guid: Str<Guid>,
     pub(crate) initializer: Value,
-    children: Mutex<Vec<RemoteWeak>>
+    children: Mutex<Vec<RemoteWeak>>,
 }
 
 impl ChannelOwner {
@@ -38,7 +33,7 @@ impl ChannelOwner {
         parent: RemoteWeak,
         typ: Str<ObjectType>,
         guid: Str<Guid>,
-        initializer: Value
+        initializer: Value,
     ) -> Self {
         Self {
             ctx,
@@ -46,7 +41,7 @@ impl ChannelOwner {
             typ,
             guid,
             initializer,
-            children: Mutex::new(Vec::new())
+            children: Mutex::new(Vec::new()),
         }
     }
 
@@ -57,7 +52,7 @@ impl ChannelOwner {
             typ: Str::validate("".into()).unwrap(),
             guid: Str::validate("".into()).unwrap(),
             initializer: Value::default(),
-            children: Mutex::default()
+            children: Mutex::default(),
         }
     }
 
@@ -67,7 +62,7 @@ impl ChannelOwner {
 
     pub(crate) async fn send_message(
         &self,
-        r: RequestBody
+        r: RequestBody,
     ) -> Result<WaitData<WaitMessageResult>, Error> {
         let wait = WaitData::new();
         let r = r.set_wait(&wait);
@@ -76,7 +71,9 @@ impl ChannelOwner {
         Ok(wait)
     }
 
-    pub(crate) fn children(&self) -> Vec<RemoteWeak> { self.children.lock().unwrap().to_vec() }
+    pub(crate) fn children(&self) -> Vec<RemoteWeak> {
+        self.children.lock().unwrap().to_vec()
+    }
 
     pub(crate) fn push_child(&self, c: RemoteWeak) {
         let children = &mut self.children.lock().unwrap();
@@ -86,52 +83,68 @@ impl ChannelOwner {
 
 #[derive(Debug)]
 pub(crate) struct DummyObject {
-    channel: ChannelOwner
+    channel: ChannelOwner,
 }
 
 impl DummyObject {
-    pub(crate) fn new(channel: ChannelOwner) -> Self { DummyObject { channel } }
+    pub(crate) fn new(channel: ChannelOwner) -> Self {
+        DummyObject { channel }
+    }
 }
 
 impl RemoteObject for DummyObject {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 #[derive(Debug)]
 pub(crate) struct RootObject {
-    channel: ChannelOwner
+    channel: ChannelOwner,
 }
 
 impl RootObject {
     pub(crate) fn new() -> Self {
         Self {
-            channel: ChannelOwner::new_root()
+            channel: ChannelOwner::new_root(),
         }
     }
 }
 
 impl Default for RootObject {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RemoteObject for RootObject {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 pub(crate) trait RemoteObject: Debug {
     fn channel(&self) -> &ChannelOwner;
     fn channel_mut(&mut self) -> &mut ChannelOwner;
 
-    fn guid(&self) -> &S<Guid> { &self.channel().guid }
-    fn context(&self) -> Result<Arc<Mutex<Context>>, Error> { upgrade(&self.channel().ctx) }
+    fn guid(&self) -> &S<Guid> {
+        &self.channel().guid
+    }
+    fn context(&self) -> Result<Arc<Mutex<Context>>, Error> {
+        upgrade(&self.channel().ctx)
+    }
 
     fn handle_event(
         &self,
         _ctx: &Context,
         _method: Str<Method>,
-        _params: Map<String, Value>
+        _params: Map<String, Value>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -145,7 +158,7 @@ mod remote_enum {
         console_message::ConsoleMessage, dialog::Dialog, element_handle::ElementHandle,
         frame::Frame, js_handle::JsHandle, page::Page, playwright::Playwright, request::Request,
         response::Response, route::Route, selectors::Selectors, stream::Stream, tracing::Tracing,
-        websocket::WebSocket, websocket_route::WebSocketRoute, worker::Worker
+        websocket::WebSocket, websocket_route::WebSocketRoute, worker::Worker,
     };
 
     macro_rules! upgrade {
@@ -259,7 +272,7 @@ mod remote_enum {
         pub(crate) fn try_new(
             typ: &S<ObjectType>,
             ctx: &Context,
-            c: ChannelOwner
+            c: ChannelOwner,
         ) -> Result<RemoteArc, Error> {
             let r = match typ.as_str() {
                 "Artifact" => RemoteArc::Artifact(Arc::new(Artifact::try_new(c)?)),
@@ -293,7 +306,7 @@ mod remote_enum {
                     RemoteArc::WebSocketRoute(Arc::new(WebSocketRoute::try_new(c)?))
                 }
                 "Worker" => RemoteArc::Worker(Arc::new(Worker::try_new(c)?)),
-                _ => RemoteArc::Dummy(Arc::new(DummyObject::new(c)))
+                _ => RemoteArc::Dummy(Arc::new(DummyObject::new(c))),
             };
             Ok(r)
         }
@@ -307,7 +320,7 @@ pub(crate) struct RequestBody {
     pub(crate) method: Str<Method>,
     pub(crate) params: Map<String, Value>,
     pub(crate) metadata: Map<String, Value>,
-    pub(crate) place: WaitPlaces<WaitMessageResult>
+    pub(crate) place: WaitPlaces<WaitMessageResult>,
 }
 
 impl RequestBody {
@@ -317,7 +330,7 @@ impl RequestBody {
             method,
             params: Map::default(),
             metadata: Map::default(),
-            place: WaitPlaces::new_empty()
+            place: WaitPlaces::new_empty(),
         }
     }
 
@@ -335,7 +348,7 @@ impl RequestBody {
         let v = serde_json::value::to_value(body).map_err(Error::Serde)?;
         let p = match v {
             Value::Object(m) => m,
-            _ => return Err(Error::NotObject)
+            _ => return Err(Error::NotObject),
         };
         Ok(self.set_params(p))
     }
@@ -356,19 +369,19 @@ pub(crate) type WaitMessageResult = Result<Result<Arc<Value>, Arc<ErrorMessage>>
 #[derive(Debug, Clone)]
 pub(crate) struct WaitPlaces<T> {
     pub(crate) value: Wm<Option<T>>,
-    pub(crate) waker: Wm<Option<Waker>>
+    pub(crate) waker: Wm<Option<Waker>>,
 }
 
 pub(crate) struct WaitData<T> {
     place: Arc<Mutex<Option<T>>>,
-    waker: Arc<Mutex<Option<Waker>>>
+    waker: Arc<Mutex<Option<Waker>>>,
 }
 
 impl<T> WaitPlaces<T> {
     pub(crate) fn new_empty() -> Self {
         Self {
             value: Weak::new(),
-            waker: Weak::new()
+            waker: Weak::new(),
         }
     }
 }
@@ -385,14 +398,14 @@ impl<T> WaitData<T> {
         let ww = Arc::downgrade(&self.waker);
         WaitPlaces {
             value: wp,
-            waker: ww
+            waker: ww,
         }
     }
 }
 
 impl<T> Future for WaitData<T>
 where
-    T: Clone
+    T: Clone,
 {
     type Output = T;
 
@@ -409,7 +422,7 @@ where
             let x = match this.place.try_lock() {
                 Ok(x) => x,
                 Err(TryLockError::WouldBlock) => pending!(),
-                Err(e) => Err(e).unwrap()
+                Err(e) => Err(e).unwrap(),
             };
             if let Some(x) = &*x {
                 return Poll::Ready(x.clone());
@@ -419,7 +432,7 @@ where
             let mut x = match this.waker.try_lock() {
                 Ok(x) => x,
                 Err(TryLockError::WouldBlock) => pending!(),
-                Err(e) => Err(e).unwrap()
+                Err(e) => Err(e).unwrap(),
             };
             if x.is_none() {
                 *x = Some(cx.waker().clone());

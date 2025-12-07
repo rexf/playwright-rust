@@ -1,6 +1,6 @@
 use crate::{
     api::{Frame, Response},
-    imp::{core::*, prelude::*, request::Request as Impl, utils::ResponseTiming}
+    imp::{core::*, prelude::*, request::Request as Impl, utils::ResponseTiming},
 };
 
 /// Whenever the page sends a request for a network resource the following sequence of events are emitted by `Page`:
@@ -18,7 +18,7 @@ use crate::{
 /// request is  issued to a redirected url.
 #[derive(Clone)]
 pub struct Request {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for Request {
@@ -32,10 +32,14 @@ impl PartialEq for Request {
 }
 
 impl Request {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     /// Request's method (GET, POST, etc.)
-    pub fn method(&self) -> Result<String, Error> { Ok(upgrade(&self.inner)?.method().into()) }
+    pub fn method(&self) -> Result<String, Error> {
+        Ok(upgrade(&self.inner)?.method().into())
+    }
 
     /// Contains the request's resource type as it was perceived by the rendering engine. ResourceType will be one of the
     /// following: `document`, `stylesheet`, `image`, `media`, `font`, `script`, `texttrack`, `xhr`, `fetch`, `eventsource`,
@@ -44,7 +48,9 @@ impl Request {
         Ok(upgrade(&self.inner)?.resource_type().into())
     }
 
-    pub fn url(&self) -> Result<String, Error> { Ok(upgrade(&self.inner)?.url().into()) }
+    pub fn url(&self) -> Result<String, Error> {
+        Ok(upgrade(&self.inner)?.url().into())
+    }
 
     /// Whether this request is driving frame's navigation.
     pub fn is_navigation_request(&self) -> Result<bool, Error> {
@@ -111,7 +117,9 @@ impl Request {
     ///  console.log(request.url() + ' ' + request.failure().errorText);
     /// });
     /// ```
-    pub fn failure(&self) -> Result<Option<String>, Error> { Ok(upgrade(&self.inner)?.failure()) }
+    pub fn failure(&self) -> Result<Option<String>, Error> {
+        Ok(upgrade(&self.inner)?.failure())
+    }
 
     /// Returns resource timing information for given request. Most of the timing values become available upon the response,
     /// `responseEnd` becomes available when request finishes. Find more information at

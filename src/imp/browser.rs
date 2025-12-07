@@ -1,10 +1,10 @@
 use crate::imp::{
+    artifact::Artifact,
     browser_context::BrowserContext,
     browser_type::{RecordHar, RecordVideo},
     core::*,
     prelude::*,
     utils::{ColorScheme, Geolocation, HttpCredentials, ProxySettings, StorageState, Viewport},
-    artifact::Artifact
 };
 use tokio::sync::oneshot;
 
@@ -12,20 +12,20 @@ use tokio::sync::oneshot;
 pub(crate) struct Browser {
     channel: ChannelOwner,
     version: String,
-    var: Mutex<Variable>
+    var: Mutex<Variable>,
 }
 
 #[derive(Debug)]
 enum Either<R, C> {
     Result(R),
-    Context(C)
+    Context(C),
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Variable {
     contexts: Vec<Weak<BrowserContext>>,
     is_remote: bool,
-    pending_context: Option<oneshot::Sender<Weak<BrowserContext>>>
+    pending_context: Option<oneshot::Sender<Weak<BrowserContext>>>,
 }
 
 impl Browser {
@@ -37,11 +37,13 @@ impl Browser {
             var: Mutex::new(Variable {
                 contexts: Vec::new(),
                 is_remote: false,
-                pending_context: None
-            })
+                pending_context: None,
+            }),
         })
     }
-    pub(crate) fn version(&self) -> &str { &self.version }
+    pub(crate) fn version(&self) -> &str {
+        &self.version
+    }
 
     pub(crate) async fn close(&self) -> Result<(), Arc<Error>> {
         let _ = send_message!(self, "close", Map::new());
@@ -66,15 +68,12 @@ impl Browser {
     }
 
     pub(crate) fn take_pending_context_sender(
-        &self
+        &self,
     ) -> Option<oneshot::Sender<Weak<BrowserContext>>> {
         self.var.lock().unwrap().pending_context.take()
     }
 
-    pub(crate) fn set_pending_context_sender(
-        &self,
-        tx: oneshot::Sender<Weak<BrowserContext>>
-    ) {
+    pub(crate) fn set_pending_context_sender(&self, tx: oneshot::Sender<Weak<BrowserContext>>) {
         self.var.lock().unwrap().pending_context = Some(tx);
     }
 
@@ -83,15 +82,22 @@ impl Browser {
         contexts.remove_one(|v| v.ptr_eq(c));
     }
 
-    pub(crate) fn is_remote(&self) -> bool { self.var.lock().unwrap().is_remote }
+    pub(crate) fn is_remote(&self) -> bool {
+        self.var.lock().unwrap().is_remote
+    }
 
-    pub(crate) fn set_is_remote_true(&self) { self.var.lock().unwrap().is_remote = true; }
+    pub(crate) fn set_is_remote_true(&self) {
+        self.var.lock().unwrap().is_remote = true;
+    }
 
     pub(crate) async fn new_context(
         &self,
-        args: NewContextArgs<'_, '_, '_, '_, '_, '_, '_>
+        args: NewContextArgs<'_, '_, '_, '_, '_, '_, '_>,
     ) -> Result<Weak<BrowserContext>, Arc<Error>> {
-        use tokio::{select, time::{timeout, Duration}};
+        use tokio::{
+            select,
+            time::{timeout, Duration},
+        };
 
         // Track existing contexts so we can fall back to the newly created one even if
         // the protocol never delivers a `result` response (observed with newer drivers).
@@ -161,7 +167,7 @@ impl Browser {
 
     fn fallback_find_context(
         &self,
-        existing: Vec<Weak<BrowserContext>>
+        existing: Vec<Weak<BrowserContext>>,
     ) -> Result<Weak<BrowserContext>, Arc<Error>> {
         // First, try the contexts vector that tracks registrations.
         let after = self.contexts();
@@ -213,14 +219,18 @@ impl Browser {
 }
 
 impl RemoteObject for Browser {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Initializer {
-    version: String
+    version: String,
 }
 
 #[skip_serializing_none]
@@ -258,7 +268,7 @@ pub(crate) struct NewContextArgs<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
     pub(crate) record_video: Option<RecordVideo<'j>>,
     pub(crate) record_har: Option<RecordHar<'k>>,
 
-    pub(crate) storage_state: Option<StorageState>
+    pub(crate) storage_state: Option<StorageState>,
 }
 
 impl<'e, 'f, 'g, 'h, 'i, 'j, 'k> Default for NewContextArgs<'e, 'f, 'g, 'h, 'i, 'j, 'k> {
@@ -288,7 +298,7 @@ impl<'e, 'f, 'g, 'h, 'i, 'j, 'k> Default for NewContextArgs<'e, 'f, 'g, 'h, 'i, 
             chromium_sandbox: None,
             record_video: None,
             record_har: None,
-            storage_state: None
+            storage_state: None,
         }
     }
 }
@@ -300,7 +310,7 @@ pub(crate) struct StartTracingArgs<'a> {
     pub(crate) page: Option<Str<Guid>>,
     pub(crate) path: Option<&'a str>,
     pub(crate) screenshots: Option<bool>,
-    pub(crate) categories: Option<Vec<&'a str>>
+    pub(crate) categories: Option<Vec<&'a str>>,
 }
 
 impl Browser {
@@ -313,11 +323,11 @@ impl Browser {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct Res {
-            artifact: OnlyGuid
+            artifact: OnlyGuid,
         }
         let v = send_message!(self, "stopTracing", Map::new());
         let Res {
-            artifact: OnlyGuid { guid }
+            artifact: OnlyGuid { guid },
         } = serde_json::from_value((*v).clone()).map_err(Error::Serde)?;
         let artifact = get_object!(self.context()?.lock().unwrap(), &guid, Artifact)?;
         Ok(artifact)

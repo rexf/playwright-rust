@@ -3,7 +3,7 @@ use crate::{api::Page, imp::web_error::WebError as Impl};
 #[derive(Clone, Debug)]
 pub struct WebError {
     page: Option<Page>,
-    error: String
+    error: String,
 }
 
 impl WebError {
@@ -11,11 +11,15 @@ impl WebError {
         let page = inner.page().map(Page::new);
         Self {
             page,
-            error: inner.error().to_owned()
+            error: inner.error().to_owned(),
         }
     }
 
-    pub fn page(&self) -> Option<&Page> { self.page.as_ref() }
+    pub fn page(&self) -> Option<&Page> {
+        self.page.as_ref()
+    }
 
-    pub fn error(&self) -> &str { &self.error }
+    pub fn error(&self) -> &str {
+        &self.error
+    }
 }

@@ -1,5 +1,5 @@
 use crate::imp::{
-    browser_context::BrowserContext, core::*, js_handle::JsHandle, page::Page, prelude::*
+    browser_context::BrowserContext, core::*, js_handle::JsHandle, page::Page, prelude::*,
 };
 
 #[derive(Debug)]
@@ -7,13 +7,13 @@ pub(crate) struct Worker {
     channel: ChannelOwner,
     url: String,
     var: Mutex<Variable>,
-    tx: Mutex<Option<broadcast::Sender<Evt>>>
+    tx: Mutex<Option<broadcast::Sender<Evt>>>,
 }
 
 #[derive(Debug, Default)]
 pub(crate) struct Variable {
     page: Option<Weak<Page>>,
-    browser_context: Option<Weak<BrowserContext>>
+    browser_context: Option<Weak<BrowserContext>>,
 }
 
 impl Worker {
@@ -23,15 +23,17 @@ impl Worker {
             channel,
             url,
             var: Mutex::default(),
-            tx: Mutex::default()
+            tx: Mutex::default(),
         })
     }
 
-    pub(crate) fn url(&self) -> &str { &self.url }
+    pub(crate) fn url(&self) -> &str {
+        &self.url
+    }
 
     pub(crate) async fn eval<U>(&self, expression: &str) -> ArcResult<U>
     where
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         self.evaluate::<(), U>(expression, None).await
     }
@@ -39,13 +41,13 @@ impl Worker {
     pub(crate) async fn evaluate<T, U>(&self, expression: &str, arg: Option<T>) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
             expression: &'a str,
-            arg: Value
+            arg: Value,
         }
         let arg = ser::to_value(&arg).map_err(Error::SerializationPwJson)?;
         let args = Args { expression, arg };
@@ -61,16 +63,16 @@ impl Worker {
     pub(crate) async fn evaluate_handle<T>(
         &self,
         expression: &str,
-        arg: Option<T>
+        arg: Option<T>,
     ) -> ArcResult<Weak<JsHandle>>
     where
-        T: Serialize
+        T: Serialize,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
             expression: &'a str,
-            arg: Value
+            arg: Value,
         }
         let arg = ser::to_value(&arg).map_err(Error::SerializationPwJson)?;
         let args = Args { expression, arg };
@@ -82,7 +84,9 @@ impl Worker {
 }
 
 impl Worker {
-    pub(crate) fn set_page(&self, page: Weak<Page>) { self.var.lock().unwrap().page = Some(page); }
+    pub(crate) fn set_page(&self, page: Weak<Page>) {
+        self.var.lock().unwrap().page = Some(page);
+    }
 
     // pub(crate) fn set_browser_context(&self, browser_context: Weak<BrowserContext>) {
     //    self.var.lock().unwrap().browser_context = Some(browser_context);
@@ -101,14 +105,18 @@ impl Worker {
 }
 
 impl RemoteObject for Worker {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 
     fn handle_event(
         &self,
         ctx: &Context,
         method: Str<Method>,
-        _params: Map<String, Value>
+        _params: Map<String, Value>,
     ) -> Result<(), Error> {
         if method.as_str() == "close" {
             self.on_close(ctx)?;
@@ -120,17 +128,17 @@ impl RemoteObject for Worker {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Initializer {
-    url: String
+    url: String,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum Evt {
-    Close
+    Close,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum EventType {
-    Close
+    Close,
 }
 
 impl IsEvent for Evt {
@@ -138,13 +146,17 @@ impl IsEvent for Evt {
 
     fn event_type(&self) -> Self::EventType {
         match self {
-            Self::Close => EventType::Close
+            Self::Close => EventType::Close,
         }
     }
 }
 
 impl EventEmitter for Worker {
     type Event = Evt;
-    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> { self.tx.lock().unwrap().clone() }
-    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) { *self.tx.lock().unwrap() = Some(tx); }
+    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> {
+        self.tx.lock().unwrap().clone()
+    }
+    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) {
+        *self.tx.lock().unwrap() = Some(tx);
+    }
 }

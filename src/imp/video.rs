@@ -2,11 +2,13 @@ use crate::imp::{artifact::Artifact, core::*, prelude::*};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Video {
-    artifact: Weak<Artifact>
+    artifact: Weak<Artifact>,
 }
 
 impl Video {
-    pub(crate) fn new(artifact: Weak<Artifact>) -> Self { Self { artifact } }
+    pub(crate) fn new(artifact: Weak<Artifact>) -> Self {
+        Self { artifact }
+    }
 
     pub(crate) fn path(&self) -> Result<PathBuf, Error> {
         Ok(upgrade(&self.artifact)?.absolute_path.as_str().into())
@@ -16,5 +18,7 @@ impl Video {
         upgrade(&self.artifact)?.save_as(path).await
     }
 
-    pub(crate) async fn delete(&self) -> ArcResult<()> { upgrade(&self.artifact)?.delete().await }
+    pub(crate) async fn delete(&self) -> ArcResult<()> {
+        upgrade(&self.artifact)?.delete().await
+    }
 }

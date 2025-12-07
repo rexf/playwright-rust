@@ -3,7 +3,7 @@ use crate::imp::{
     frame::Frame,
     prelude::*,
     response::Response,
-    utils::{Header, ResponseTiming}
+    utils::{Header, ResponseTiming},
 };
 use base64::{engine::general_purpose, Engine as _};
 
@@ -18,7 +18,7 @@ pub(crate) struct Request {
     frame: Weak<Frame>,
     headers: HashMap<String, String>,
     redirected_from: Option<Weak<Request>>,
-    var: Mutex<Variable>
+    var: Mutex<Variable>,
 }
 
 #[derive(Debug, Default)]
@@ -26,7 +26,7 @@ pub(crate) struct Variable {
     redirected_to: Option<Weak<Request>>,
     failure: Option<String>,
     timing: Option<ResponseTiming>,
-    response_end: Option<f64>
+    response_end: Option<f64>,
 }
 
 impl Request {
@@ -39,7 +39,7 @@ impl Request {
             is_navigation_request,
             post_data,
             headers,
-            redirected_from
+            redirected_from,
         } = serde_json::from_value(channel.initializer.clone())?;
         let headers: HashMap<_, _> = headers
             .into_iter()
@@ -54,7 +54,7 @@ impl Request {
             match redirected_from.map(|OnlyGuid { guid }| get_object!(ctx, &guid, Request)) {
                 None => None,
                 Some(Ok(x)) => Some(x),
-                Some(Err(e)) => return Err(e)
+                Some(Err(e)) => return Err(e),
             };
         let var = Mutex::new(Variable::default());
         let arc = Arc::new(Self {
@@ -67,7 +67,7 @@ impl Request {
             frame,
             headers,
             redirected_from,
-            var
+            var,
         });
         if let Some(from) = arc.redirected_from.as_ref().and_then(|w| w.upgrade()) {
             let this = Arc::downgrade(&arc);
@@ -76,18 +76,30 @@ impl Request {
         Ok(arc)
     }
 
-    pub(crate) fn url(&self) -> &str { &self.url }
+    pub(crate) fn url(&self) -> &str {
+        &self.url
+    }
 
-    pub(crate) fn resource_type(&self) -> &str { &self.resource_type }
+    pub(crate) fn resource_type(&self) -> &str {
+        &self.resource_type
+    }
 
-    pub(crate) fn method(&self) -> &str { &self.method }
+    pub(crate) fn method(&self) -> &str {
+        &self.method
+    }
 
-    pub(crate) fn is_navigation_request(&self) -> bool { self.is_navigation_request }
+    pub(crate) fn is_navigation_request(&self) -> bool {
+        self.is_navigation_request
+    }
 
-    pub(crate) fn frame(&self) -> Weak<Frame> { self.frame.clone() }
+    pub(crate) fn frame(&self) -> Weak<Frame> {
+        self.frame.clone()
+    }
 
     pub(crate) fn post_data(&self) -> Option<Vec<u8>> {
-        general_purpose::STANDARD.decode(self.post_data.as_ref()?).ok()
+        general_purpose::STANDARD
+            .decode(self.post_data.as_ref()?)
+            .ok()
     }
 
     pub(crate) fn post_data_as_string(&self) -> Option<String> {
@@ -96,15 +108,19 @@ impl Request {
         Some(s)
     }
 
-    pub(crate) fn headers(&self) -> &HashMap<String, String> { &self.headers }
+    pub(crate) fn headers(&self) -> &HashMap<String, String> {
+        &self.headers
+    }
 
-    pub(crate) fn redirected_from(&self) -> Option<Weak<Request>> { self.redirected_from.clone() }
+    pub(crate) fn redirected_from(&self) -> Option<Weak<Request>> {
+        self.redirected_from.clone()
+    }
 
     pub(crate) async fn response(&self) -> ArcResult<Option<Weak<Response>>> {
         let v = send_message!(self, "response", Map::new());
         let guid = match as_only_guid(&v) {
             Some(g) => g,
-            None => return Ok(None)
+            None => return Ok(None),
         };
         let r = get_object!(self.context()?.lock().unwrap(), guid, Response)?;
         Ok(Some(r))
@@ -116,9 +132,13 @@ impl Request {
         self.var.lock().unwrap().timing.clone()
     }
 
-    pub(crate) fn response_end(&self) -> Option<f64> { self.var.lock().unwrap().response_end }
+    pub(crate) fn response_end(&self) -> Option<f64> {
+        self.var.lock().unwrap().response_end
+    }
 
-    pub(crate) fn failure(&self) -> Option<String> { self.var.lock().unwrap().failure.clone() }
+    pub(crate) fn failure(&self) -> Option<String> {
+        self.var.lock().unwrap().failure.clone()
+    }
 
     pub(crate) fn redirected_to(&self) -> Option<Weak<Request>> {
         self.var.lock().unwrap().redirected_to.clone()
@@ -153,8 +173,12 @@ impl Request {
 }
 
 impl RemoteObject for Request {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -168,5 +192,5 @@ struct Initializer {
     // base64
     post_data: Option<String>,
     headers: Vec<Header>,
-    redirected_from: Option<OnlyGuid>
+    redirected_from: Option<OnlyGuid>,
 }

@@ -2,12 +2,12 @@ pub use crate::imp::websocket::Buffer;
 use crate::imp::{
     core::*,
     prelude::*,
-    websocket::{Evt, WebSocket as Impl}
+    websocket::{Evt, WebSocket as Impl},
 };
 
 #[derive(Clone)]
 pub struct WebSocket {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for WebSocket {
@@ -21,12 +21,18 @@ impl PartialEq for WebSocket {
 }
 
 impl WebSocket {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     /// Contains the URL of the WebSocket.
-    pub fn url(&self) -> Result<String, Error> { Ok(upgrade(&self.inner)?.url().to_owned()) }
+    pub fn url(&self) -> Result<String, Error> {
+        Ok(upgrade(&self.inner)?.url().to_owned())
+    }
 
-    pub fn is_closed(&self) -> Result<bool, Error> { Ok(upgrade(&self.inner)?.is_closed()) }
+    pub fn is_closed(&self) -> Result<bool, Error> {
+        Ok(upgrade(&self.inner)?.is_closed())
+    }
 
     subscribe_event! {}
 }
@@ -36,7 +42,7 @@ pub enum Event {
     FrameSent(Buffer),
     FrameReceived(Buffer),
     Error(Value),
-    Close
+    Close,
 }
 
 impl From<Evt> for Event {
@@ -45,7 +51,7 @@ impl From<Evt> for Event {
             Evt::FrameSent(x) => Self::FrameSent(x),
             Evt::FrameReceived(x) => Self::FrameReceived(x),
             Evt::Error(x) => Self::Error(x),
-            Evt::Close => Self::Close
+            Evt::Close => Self::Close,
         }
     }
 }

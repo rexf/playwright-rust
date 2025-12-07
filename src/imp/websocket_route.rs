@@ -1,8 +1,4 @@
-use crate::imp::{
-    core::*,
-    prelude::*,
-    websocket::Buffer
-};
+use crate::imp::{core::*, prelude::*, websocket::Buffer};
 use base64::{engine::general_purpose, Engine as _};
 
 #[derive(Debug)]
@@ -10,12 +6,12 @@ pub(crate) struct WebSocketRoute {
     channel: ChannelOwner,
     url: String,
     var: Mutex<Variable>,
-    tx: Mutex<Option<broadcast::Sender<Evt>>>
+    tx: Mutex<Option<broadcast::Sender<Evt>>>,
 }
 
 #[derive(Debug, Default)]
 struct Variable {
-    connected: bool
+    connected: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -25,13 +21,13 @@ pub(crate) enum Evt {
     CloseFromPage {
         code: i32,
         reason: String,
-        was_clean: bool
+        was_clean: bool,
     },
     CloseFromServer {
         code: i32,
         reason: String,
-        was_clean: bool
-    }
+        was_clean: bool,
+    },
 }
 
 impl WebSocketRoute {
@@ -39,18 +35,20 @@ impl WebSocketRoute {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct Init {
-            url: String
+            url: String,
         }
         let Init { url } = serde_json::from_value(channel.initializer.clone())?;
         Ok(Self {
             channel,
             url,
             var: Mutex::default(),
-            tx: Mutex::default()
+            tx: Mutex::default(),
         })
     }
 
-    pub(crate) fn url(&self) -> &str { &self.url }
+    pub(crate) fn url(&self) -> &str {
+        &self.url
+    }
 
     pub(crate) async fn connect_to_server(&self) -> ArcResult<()> {
         {
@@ -98,19 +96,23 @@ impl WebSocketRoute {
         Ok(())
     }
 
-    pub(crate) async fn close_page(&self, code: Option<i32>, reason: Option<&str>) -> ArcResult<()> {
+    pub(crate) async fn close_page(
+        &self,
+        code: Option<i32>,
+        reason: Option<&str>,
+    ) -> ArcResult<()> {
         #[skip_serializing_none]
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
             code: Option<i32>,
             reason: Option<&'a str>,
-            was_clean: bool
+            was_clean: bool,
         }
         let args = Args {
             code,
             reason,
-            was_clean: true
+            was_clean: true,
         };
         let _ = send_message!(self, "closePage", args);
         Ok(())
@@ -119,7 +121,7 @@ impl WebSocketRoute {
     pub(crate) async fn close_server(
         &self,
         code: Option<i32>,
-        reason: Option<&str>
+        reason: Option<&str>,
     ) -> ArcResult<()> {
         #[skip_serializing_none]
         #[derive(Serialize)]
@@ -127,37 +129,50 @@ impl WebSocketRoute {
         struct Args<'a> {
             code: Option<i32>,
             reason: Option<&'a str>,
-            was_clean: bool
+            was_clean: bool,
         }
         let args = Args {
             code,
             reason,
-            was_clean: true
+            was_clean: true,
         };
         let _ = send_message!(self, "closeServer", args);
         Ok(())
     }
 
-    fn emit(&self, evt: Evt) { self.emit_event(evt); }
+    fn emit(&self, evt: Evt) {
+        self.emit_event(evt);
+    }
 }
 
 impl RemoteObject for WebSocketRoute {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 
     fn handle_event(
         &self,
         _ctx: &Context,
         method: Str<Method>,
-        params: Map<String, Value>
+        params: Map<String, Value>,
     ) -> Result<(), Error> {
         match method.as_str() {
             "messageFromPage" => {
-                let message = params.get("message").and_then(|v| v.as_str()).unwrap_or_default();
-                let is_base64 = params.get("isBase64").and_then(|v| v.as_bool()).unwrap_or(false);
+                let message = params
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let is_base64 = params
+                    .get("isBase64")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 let buffer = if is_base64 {
-                    let bytes =
-                        general_purpose::STANDARD.decode(message).map_err(Error::InvalidBase64)?;
+                    let bytes = general_purpose::STANDARD
+                        .decode(message)
+                        .map_err(Error::InvalidBase64)?;
                     Buffer::Bytes(bytes)
                 } else {
                     Buffer::String(message.to_owned())
@@ -165,11 +180,18 @@ impl RemoteObject for WebSocketRoute {
                 self.emit(Evt::MessageFromPage(buffer));
             }
             "messageFromServer" => {
-                let message = params.get("message").and_then(|v| v.as_str()).unwrap_or_default();
-                let is_base64 = params.get("isBase64").and_then(|v| v.as_bool()).unwrap_or(false);
+                let message = params
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let is_base64 = params
+                    .get("isBase64")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
                 let buffer = if is_base64 {
-                    let bytes =
-                        general_purpose::STANDARD.decode(message).map_err(Error::InvalidBase64)?;
+                    let bytes = general_purpose::STANDARD
+                        .decode(message)
+                        .map_err(Error::InvalidBase64)?;
                     Buffer::Bytes(bytes)
                 } else {
                     Buffer::String(message.to_owned())
@@ -183,11 +205,14 @@ impl RemoteObject for WebSocketRoute {
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
                     .to_owned();
-                let was_clean = params.get("wasClean").and_then(|v| v.as_bool()).unwrap_or(true);
+                let was_clean = params
+                    .get("wasClean")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 self.emit(Evt::CloseFromPage {
                     code,
                     reason,
-                    was_clean
+                    was_clean,
                 });
             }
             "closeServer" => {
@@ -197,11 +222,14 @@ impl RemoteObject for WebSocketRoute {
                     .and_then(|v| v.as_str())
                     .unwrap_or_default()
                     .to_owned();
-                let was_clean = params.get("wasClean").and_then(|v| v.as_bool()).unwrap_or(true);
+                let was_clean = params
+                    .get("wasClean")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 self.emit(Evt::CloseFromServer {
                     code,
                     reason,
-                    was_clean
+                    was_clean,
                 });
             }
             _ => {}
@@ -213,7 +241,11 @@ impl RemoteObject for WebSocketRoute {
 impl EventEmitter for WebSocketRoute {
     type Event = Evt;
 
-    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> { self.tx.lock().unwrap().clone() }
+    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> {
+        self.tx.lock().unwrap().clone()
+    }
 
-    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) { *self.tx.lock().unwrap() = Some(tx); }
+    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) {
+        *self.tx.lock().unwrap() = Some(tx);
+    }
 }

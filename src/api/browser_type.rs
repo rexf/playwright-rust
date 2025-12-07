@@ -3,29 +3,33 @@ use crate::{
     api::{browser::Browser, browser_context::BrowserContext, playwright::DeviceDescriptor},
     imp::{
         browser_type::{
-            BrowserType as Impl, ConnectOverCdpArgs, LaunchArgs, LaunchPersistentContextArgs
+            BrowserType as Impl, ConnectOverCdpArgs, LaunchArgs, LaunchPersistentContextArgs,
         },
         core::*,
         prelude::*,
         utils::{
-            BrowserChannel, ColorScheme, Geolocation, HttpCredentials, ProxySettings, Viewport
-        }
+            BrowserChannel, ColorScheme, Geolocation, HttpCredentials, ProxySettings, Viewport,
+        },
     },
-    Error
+    Error,
 };
 
 #[derive(Debug, Clone)]
 pub struct BrowserType {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl BrowserType {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     /// Returns browser name. For example: `'chromium'`, `'webkit'` or `'firefox'`.
     /// # Errors
     /// Returns error only if this function is called after object is disposed.
-    pub fn name(&self) -> Result<String, Error> { Ok(upgrade(&self.inner)?.name().into()) }
+    pub fn name(&self) -> Result<String, Error> {
+        Ok(upgrade(&self.inner)?.name().into())
+    }
 
     /// A path where Playwright expects to find a bundled browser executable.
     /// # Errors
@@ -59,7 +63,9 @@ impl BrowserType {
     /// differences between Chromium and Chrome.
     /// [This article](https://chromium.googlesource.com/chromium/src/+/lkgr/docs/chromium_browser_vs_google_chrome.md)
     /// describes some differences for Linux users.
-    pub fn launcher(&self) -> Launcher<'_, '_, '_> { Launcher::new(self.inner.clone()) }
+    pub fn launcher(&self) -> Launcher<'_, '_, '_> {
+        Launcher::new(self.inner.clone())
+    }
 
     /// launch_persistent_context [`BrowserContext`]
     /// Returns the persistent browser context instance.
@@ -72,7 +78,7 @@ impl BrowserType {
     /// data directory is the **parent** directory of the "Profile Path" seen at `chrome://version`.
     pub fn persistent_context_launcher<'a>(
         &self,
-        user_data_dir: &'a Path
+        user_data_dir: &'a Path,
     ) -> PersistentContextLauncher<'a, '_, '_, '_, '_, '_, '_, '_, '_, '_, '_> {
         PersistentContextLauncher::new(self.inner.clone(), user_data_dir)
     }
@@ -95,7 +101,7 @@ impl BrowserType {
 /// [`BrowserType::launcher`]
 pub struct Launcher<'a, 'b, 'c> {
     inner: Weak<Impl>,
-    args: LaunchArgs<'a, 'b, 'c>
+    args: LaunchArgs<'a, 'b, 'c>,
 }
 
 impl<'a, 'b, 'c> Launcher<'a, 'b, 'c> {
@@ -108,7 +114,7 @@ impl<'a, 'b, 'c> Launcher<'a, 'b, 'c> {
     fn new(inner: Weak<Impl>) -> Self {
         Launcher {
             inner,
-            args: LaunchArgs::default()
+            args: LaunchArgs::default(),
         }
     }
 
@@ -167,7 +173,7 @@ impl<'a, 'b, 'c> Launcher<'a, 'b, 'c> {
 /// Has launch args and context args
 pub struct PersistentContextLauncher<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k> {
     inner: Weak<Impl>,
-    args: LaunchPersistentContextArgs<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k>
+    args: LaunchPersistentContextArgs<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k>,
 }
 
 impl<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k>
@@ -182,7 +188,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k>
     fn new(inner: Weak<Impl>, user_data_dir: &'a Path) -> Self {
         Self {
             inner,
-            args: LaunchPersistentContextArgs::new(user_data_dir)
+            args: LaunchPersistentContextArgs::new(user_data_dir),
         }
     }
 
@@ -300,7 +306,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j, 'k>
 
 pub struct ConnectOverCdpBuilder<'a> {
     inner: Weak<Impl>,
-    args: ConnectOverCdpArgs<'a>
+    args: ConnectOverCdpArgs<'a>,
 }
 
 impl<'a> ConnectOverCdpBuilder<'a> {
@@ -313,7 +319,7 @@ impl<'a> ConnectOverCdpBuilder<'a> {
     fn new(inner: Weak<Impl>, endpoint_url: &'a str) -> Self {
         Self {
             inner,
-            args: ConnectOverCdpArgs::new(endpoint_url)
+            args: ConnectOverCdpArgs::new(endpoint_url),
         }
     }
 

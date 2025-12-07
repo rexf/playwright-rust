@@ -4,17 +4,17 @@ pub use crate::{
             AddScriptTagBuilder, CheckBuilder, ClickBuilder, DblClickBuilder, FillBuilder,
             GotoBuilder, HoverBuilder, PressBuilder, SelectOptionBuilder, SetContentBuilder,
             SetInputFilesBuilder, TapBuilder, TypeBuilder, UncheckBuilder, WaitForFunctionBuilder,
-            WaitForSelectorBuilder
+            WaitForSelectorBuilder,
         },
-        Download, JsHandle, Request
+        Download, JsHandle, Request,
     },
-    imp::page::{EventType, Media}
+    imp::page::{EventType, Media},
 };
 use crate::{
     api::{
-        input_device::*, Accessibility, BrowserContext, ConsoleMessage, ElementHandle, Frame,
-        FrameLocator, Keyboard, Locator, Response, Route, TouchScreen, Video, WebSocket, Worker,
-        WebSocketRoute
+        input_device::*, Accessibility, BrowserContext, ConsoleMessage, Dialog, ElementHandle,
+        Frame, FrameLocator, Keyboard, Locator, Response, Route, TouchScreen, Video, WebSocket,
+        WebSocketRoute, Worker,
     },
     imp::{
         core::*,
@@ -23,10 +23,10 @@ use crate::{
         prelude::*,
         utils::{
             ColorScheme, DocumentLoadState, File, FloatRect, Length, PdfMargins, ScreenshotType,
-            Viewport
-        }
+            Viewport,
+        },
     },
-    Error
+    Error,
 };
 use regex::Regex;
 
@@ -75,7 +75,7 @@ pub struct Page {
     pub keyboard: Keyboard,
     pub touch_screen: TouchScreen,
     pub mouse: Mouse,
-    pub accessibility: Accessibility
+    pub accessibility: Accessibility,
 }
 
 impl PartialEq for Page {
@@ -95,11 +95,13 @@ impl Page {
             keyboard: Keyboard::new(inner.clone()),
             touch_screen: TouchScreen::new(inner.clone()),
             mouse: Mouse::new(inner.clone()),
-            accessibility: Accessibility::new(inner)
+            accessibility: Accessibility::new(inner),
         }
     }
 
-    pub(crate) fn inner(&self) -> Weak<Impl> { self.inner.clone() }
+    pub(crate) fn inner(&self) -> Weak<Impl> {
+        self.inner.clone()
+    }
 
     pub fn context(&self) -> BrowserContext {
         BrowserContext::new(weak_and_then(&self.inner, |rc| rc.browser_context()))
@@ -110,7 +112,9 @@ impl Page {
     }
 
     /// The page's main frame. Page is guaranteed to have a main frame which persists during navigations.
-    pub fn main_frame(&self) -> Frame { Frame::new(self.main_frame_weak()) }
+    pub fn main_frame(&self) -> Frame {
+        Frame::new(self.main_frame_weak())
+    }
 
     /// An array of all frames attached to the page.
     pub fn frames(&self) -> Result<Vec<Frame>, Error> {
@@ -131,6 +135,60 @@ impl Page {
         FrameLocator::new(self.main_frame(), selector.to_owned())
     }
 
+    /// Locator-first helpers
+    pub fn get_by_role<'a>(
+        &self,
+        role: &str,
+        options: Option<crate::api::locator::GetByRoleOptions<'a>>,
+    ) -> Locator {
+        Locator::new(
+            self.main_frame(),
+            crate::api::locator::build_role_selector(role, options),
+        )
+    }
+
+    pub fn get_by_text(&self, text: &str, exact: bool) -> Locator {
+        Locator::new(
+            self.main_frame(),
+            crate::api::locator::build_text_selector(text, exact),
+        )
+    }
+
+    pub fn get_by_label(&self, text: &str, exact: bool) -> Locator {
+        Locator::new(
+            self.main_frame(),
+            crate::api::locator::build_label_selector(text, exact),
+        )
+    }
+
+    pub fn get_by_placeholder(&self, text: &str, exact: bool) -> Locator {
+        Locator::new(
+            self.main_frame(),
+            crate::api::locator::build_placeholder_selector(text, exact),
+        )
+    }
+
+    pub fn get_by_alt_text(&self, text: &str, exact: bool) -> Locator {
+        Locator::new(
+            self.main_frame(),
+            crate::api::locator::build_alt_text_selector(text, exact),
+        )
+    }
+
+    pub fn get_by_title(&self, text: &str, exact: bool) -> Locator {
+        Locator::new(
+            self.main_frame(),
+            crate::api::locator::build_title_selector(text, exact),
+        )
+    }
+
+    pub fn get_by_test_id(&self, test_id: &str) -> Locator {
+        Locator::new(
+            self.main_frame(),
+            crate::api::locator::build_test_id_selector(test_id),
+        )
+    }
+
     /// This method returns all of the dedicated [WebWorkers](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API)
     /// associated with the page.
     ///
@@ -145,12 +203,16 @@ impl Page {
 
     /// Returns the main resource response. In case of multiple redirects, the navigation will resolve with the response of the
     /// last redirect.
-    pub fn reload_builder(&self) -> ReloadBuilder { ReloadBuilder::new(self.inner.clone()) }
+    pub fn reload_builder(&self) -> ReloadBuilder {
+        ReloadBuilder::new(self.inner.clone())
+    }
     /// Returns the main resource response. In case of multiple redirects, the navigation will resolve with the response of the
     /// last redirect. If can not go back, returns `null`.
     ///
     /// Navigate to the previous page in history.
-    pub fn go_back_builder(&self) -> GoBackBuilder { GoBackBuilder::new(self.inner.clone()) }
+    pub fn go_back_builder(&self) -> GoBackBuilder {
+        GoBackBuilder::new(self.inner.clone())
+    }
     /// Returns the main resource response. In case of multiple redirects, the navigation will resolve with the response of the
     /// last redirect. If can not go forward, returns `null`.
     ///
@@ -213,7 +275,7 @@ impl Page {
     ///// In your playwright script, assuming the preload.js file is in same directory
     /// await page.addInitScript({ path: './preload.js' });
     /// ```
-    /// 
+    ///
     /// > NOTE: The order of evaluation of multiple scripts installed via [`method: BrowserContext.addInitScript`] and
     /// [`method: Page.addInitScript`] is not defined.
     pub async fn add_init_script(&self, source: &str) -> ArcResult<()> {
@@ -237,7 +299,7 @@ impl Page {
     /// await page.emulateMedia({media: 'screen'});
     /// await page.pdf({path: 'page.pdf'});
     /// ```
-    /// 
+    ///
     /// The `width`, `height`, and `margin` options accept values labeled with units. Unlabeled values are treated as pixels.
     ///
     /// A few examples:
@@ -282,7 +344,7 @@ impl Page {
     pub async fn close(&self, run_before_unload: Option<bool>) -> ArcResult<()> {
         let inner = match self.inner.upgrade() {
             None => return Ok(()),
-            Some(inner) => inner
+            Some(inner) => inner,
         };
         inner.close(run_before_unload).await
     }
@@ -323,6 +385,27 @@ impl Page {
         EmulateMediaBuilder::new(self.inner.clone())
     }
 
+    /// Waits for the required load state in the main frame. Defaults to `load` if not specified.
+    pub async fn wait_for_load_state(
+        &self,
+        state: Option<DocumentLoadState>,
+        timeout: Option<f64>,
+    ) -> ArcResult<()> {
+        self.main_frame().wait_for_load_state(state, timeout).await
+    }
+
+    /// Waits for the main frame to navigate to the given URL (pattern string), resolving after the chosen load state.
+    pub async fn wait_for_url(
+        &self,
+        url: &str,
+        wait_until: Option<DocumentLoadState>,
+        timeout: Option<f64>,
+    ) -> ArcResult<()> {
+        self.main_frame()
+            .wait_for_url(url, wait_until, timeout)
+            .await
+    }
+
     /// Returns the opener for popup pages and `null` for others. If the opener has been closed already the returns `null`.
     pub async fn opener(&self) -> ArcResult<Option<Page>> {
         Ok(upgrade(&self.inner)?.opener().await?.map(Page::new))
@@ -333,7 +416,7 @@ impl Page {
     /// > NOTE: [`method: Page.setExtraHTTPHeaders`] does not guarantee the order of headers in the outgoing requests.
     pub async fn set_extra_http_headers<T>(&self, headers: T) -> ArcResult<()>
     where
-        T: IntoIterator<Item = (String, String)>
+        T: IntoIterator<Item = (String, String)>,
     {
         upgrade(&self.inner)?.set_extra_http_headers(headers).await
     }
@@ -353,7 +436,7 @@ impl Page {
     pub async fn route<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
     where
         F: Fn(Route) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = ()> + Send + 'static
+        Fut: std::future::Future<Output = ()> + Send + 'static,
     {
         upgrade(&self.inner)?
             .route(
@@ -361,7 +444,7 @@ impl Page {
                 Arc::new(move |route| {
                     let route = Route::new(Arc::downgrade(&route));
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
@@ -370,7 +453,7 @@ impl Page {
     pub async fn route_regex<F, Fut>(&self, regex: &Regex, handler: F) -> ArcResult<()>
     where
         F: Fn(Route) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = ()> + Send + 'static
+        Fut: std::future::Future<Output = ()> + Send + 'static,
     {
         upgrade(&self.inner)?
             .route_regex(
@@ -379,7 +462,7 @@ impl Page {
                 Arc::new(move |route| {
                     let route = Route::new(Arc::downgrade(&route));
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
@@ -388,38 +471,38 @@ impl Page {
     pub async fn route_web_socket<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
     where
         F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = ()> + Send + 'static
+        Fut: std::future::Future<Output = ()> + Send + 'static,
     {
         upgrade(&self.inner)?
             .route_web_socket(
                 glob,
                 Arc::new(move |route| {
-                    let route =
-                        WebSocketRoute::new(Arc::downgrade(&route), crate::api::WebSocketRouteSide::Page);
+                    let route = WebSocketRoute::new(
+                        Arc::downgrade(&route),
+                        crate::api::WebSocketRouteSide::Page,
+                    );
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
 
-    pub async fn route_web_socket_regex<F, Fut>(
-        &self,
-        regex: &Regex,
-        handler: F
-    ) -> ArcResult<()>
+    pub async fn route_web_socket_regex<F, Fut>(&self, regex: &Regex, handler: F) -> ArcResult<()>
     where
         F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
-        Fut: std::future::Future<Output = ()> + Send + 'static
+        Fut: std::future::Future<Output = ()> + Send + 'static,
     {
         upgrade(&self.inner)?
             .route_web_socket_regex(
                 regex.as_str(),
                 regex.as_str().contains("(?i)").then_some("i").unwrap_or(""),
                 Arc::new(move |route| {
-                    let route =
-                        WebSocketRoute::new(Arc::downgrade(&route), crate::api::WebSocketRouteSide::Page);
+                    let route = WebSocketRoute::new(
+                        Arc::downgrade(&route),
+                        crate::api::WebSocketRouteSide::Page,
+                    );
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
@@ -464,7 +547,7 @@ pub enum Event {
     /// actions like click will never finish.
     ///
     /// > NOTE: When no [`event: Page.dialog`] listeners are present, all dialogs are automatically dismissed.
-    Dialog,
+    Dialog(Dialog),
     DomContentLoaded,
     /// Emitted when attachment download started. User can access basic file operations on downloaded content via the passed
     /// `Download` instance.
@@ -521,7 +604,7 @@ pub enum Event {
     Response(Response),
     WebSocket(WebSocket),
     Worker(Worker),
-    Video(Video)
+    Video(Video),
 }
 
 impl From<Evt> for Event {
@@ -530,7 +613,7 @@ impl From<Evt> for Event {
             Evt::Close => Event::Close,
             Evt::Crash => Event::Crash,
             Evt::Console(x) => Event::Console(ConsoleMessage::new(x)),
-            Evt::Dialog => Event::Dialog,
+            Evt::Dialog(x) => Event::Dialog(Dialog::new(x)),
             Evt::Download(x) => Event::Download(Download::new(x)),
             // Evt::FileChooser(x) => Event::FileChooser(x),
             Evt::DomContentLoaded => Event::DomContentLoaded,
@@ -546,7 +629,7 @@ impl From<Evt> for Event {
             Evt::Popup(x) => Event::Popup(Page::new(x)),
             Evt::WebSocket(x) => Event::WebSocket(WebSocket::new(x)),
             Evt::Worker(x) => Event::Worker(Worker::new(x)),
-            Evt::Video(x) => Event::Video(Video::new(x))
+            Evt::Video(x) => Event::Video(Video::new(x)),
         }
     }
 }
@@ -559,7 +642,7 @@ impl IsEvent for Event {
             Self::Close => EventType::Close,
             Self::Crash => EventType::Crash,
             Self::Console(_) => EventType::Console,
-            Self::Dialog => EventType::Dialog,
+            Self::Dialog(_) => EventType::Dialog,
             Self::Download(_) => EventType::Download,
             // Self::FileChooser(_) => EventType::FileChooser,
             Self::DomContentLoaded => EventType::DomContentLoaded,
@@ -575,7 +658,7 @@ impl IsEvent for Event {
             Self::Popup(_) => EventType::Popup,
             Self::WebSocket(_) => EventType::WebSocket,
             Self::Worker(_) => EventType::Worker,
-            Self::Video(_) => EventType::Video
+            Self::Video(_) => EventType::Video,
         }
     }
 }
@@ -614,10 +697,10 @@ impl Page {
         &self,
         selector: &str,
         r#type: &str,
-        event_init: Option<T>
+        event_init: Option<T>,
     ) -> ArcResult<()>
     where
-        T: Serialize
+        T: Serialize,
     {
         // timeout not supported
         self.main_frame()
@@ -628,10 +711,10 @@ impl Page {
     pub async fn evaluate_js_handle<T>(
         &self,
         expression: &str,
-        arg: Option<T>
+        arg: Option<T>,
     ) -> ArcResult<JsHandle>
     where
-        T: Serialize
+        T: Serialize,
     {
         self.main_frame().evaluate_js_handle(expression, arg).await
     }
@@ -639,10 +722,10 @@ impl Page {
     pub async fn evaluate_element_handle<T>(
         &self,
         expression: &str,
-        arg: Option<T>
+        arg: Option<T>,
     ) -> ArcResult<ElementHandle>
     where
-        T: Serialize
+        T: Serialize,
     {
         self.main_frame()
             .evaluate_element_handle(expression, arg)
@@ -651,7 +734,7 @@ impl Page {
 
     pub async fn eval<U>(&self, expression: &str) -> ArcResult<U>
     where
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         self.main_frame().eval(expression).await
     }
@@ -659,7 +742,7 @@ impl Page {
     pub async fn evaluate<T, U>(&self, expression: &str, arg: T) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         self.main_frame().evaluate(expression, arg).await
     }
@@ -668,11 +751,11 @@ impl Page {
         &self,
         selector: &str,
         expression: &str,
-        arg: Option<T>
+        arg: Option<T>,
     ) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         self.main_frame()
             .evaluate_on_selector(selector, expression, arg)
@@ -683,11 +766,11 @@ impl Page {
         &self,
         selector: &str,
         expression: &str,
-        arg: Option<T>
+        arg: Option<T>,
     ) -> ArcResult<U>
     where
         T: Serialize,
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         self.main_frame()
             .evaluate_on_selector_all(selector, expression, arg)
@@ -701,15 +784,19 @@ impl Page {
     pub async fn add_style_tag(
         &self,
         content: &str,
-        url: Option<&str>
+        url: Option<&str>,
     ) -> ArcResult<ElementHandle> {
         self.main_frame().add_style_tag(content, url).await
     }
 
-    pub fn url(&self) -> Result<String, Error> { self.main_frame().url() }
+    pub fn url(&self) -> Result<String, Error> {
+        self.main_frame().url()
+    }
 
     /// Gets the full HTML contents of the page, including the doctype.
-    pub async fn content<'a>(&self) -> ArcResult<String> { self.main_frame().content().await }
+    pub async fn content<'a>(&self) -> ArcResult<String> {
+        self.main_frame().content().await
+    }
 
     pub fn set_content_builder<'a>(&self, html: &'a str) -> SetContentBuilder<'a> {
         self.main_frame().set_content_builder(html)
@@ -741,7 +828,9 @@ impl Page {
 
     // wait_for_load_state
 
-    pub async fn title(&self) -> ArcResult<String> { self.main_frame().title().await }
+    pub async fn title(&self) -> ArcResult<String> {
+        self.main_frame().title().await
+    }
 
     pub fn click_builder<'a>(&self, selector: &'a str) -> ClickBuilder<'a> {
         self.main_frame().click_builder(selector)
@@ -766,7 +855,7 @@ impl Page {
     pub async fn text_content(
         &self,
         selector: &str,
-        timeout: Option<f64>
+        timeout: Option<f64>,
     ) -> ArcResult<Option<String>> {
         self.main_frame().text_content(selector, timeout).await
     }
@@ -783,7 +872,7 @@ impl Page {
         &self,
         selector: &str,
         name: &str,
-        timeout: Option<f64>
+        timeout: Option<f64>,
     ) -> ArcResult<Option<String>> {
         self.main_frame()
             .get_attribute(selector, name, timeout)
@@ -801,7 +890,7 @@ impl Page {
     pub fn set_input_files_builder<'a>(
         &self,
         selector: &'a str,
-        file: File
+        file: File,
     ) -> SetInputFilesBuilder<'a> {
         self.main_frame().set_input_files_builder(selector, file)
     }
@@ -832,7 +921,7 @@ macro_rules! navigation {
     ($t: ident, $f: ident) => {
         pub struct $t {
             inner: Weak<Impl>,
-            args: ReloadArgs
+            args: ReloadArgs,
         }
 
         impl $t {
@@ -865,7 +954,7 @@ navigation!(GoForwardBuilder, go_forward);
 
 pub struct PdfBuilder<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j> {
     inner: Weak<Impl>,
-    args: PdfArgs<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j>
+    args: PdfArgs<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j>,
 }
 
 impl<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j> PdfBuilder<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j> {
@@ -920,7 +1009,7 @@ impl<'a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j> PdfBuilder<'a, 'b, 'c, 'd, 'e, 'f, 
 
 pub struct ScreenshotBuilder {
     inner: Weak<Impl>,
-    args: ScreenshotArgs
+    args: ScreenshotArgs,
 }
 
 impl ScreenshotBuilder {
@@ -966,7 +1055,7 @@ impl ScreenshotBuilder {
 
 pub struct EmulateMediaBuilder {
     inner: Weak<Impl>,
-    args: EmulateMediaArgs
+    args: EmulateMediaArgs,
 }
 
 impl EmulateMediaBuilder {

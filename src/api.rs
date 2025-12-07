@@ -32,12 +32,12 @@ macro_rules! subscribe_event {
     () => {
         // TODO: FusedStream + Sink
         pub fn subscribe_event(
-            &self
+            &self,
         ) -> Result<
             impl futures::stream::Stream<
-                Item = Result<Event, tokio_stream::wrappers::errors::BroadcastStreamRecvError>
+                Item = Result<Event, tokio_stream::wrappers::errors::BroadcastStreamRecvError>,
             >,
-            Error
+            Error,
         > {
             use futures::stream::StreamExt;
             use tokio_stream::wrappers::BroadcastStream;
@@ -47,26 +47,26 @@ macro_rules! subscribe_event {
     };
 }
 
-pub mod input_device;
-pub mod playwright;
 pub mod api_request;
 pub mod api_request_context;
 pub mod api_response;
+pub mod input_device;
+pub mod playwright;
 
 pub mod accessibility;
+pub mod artifact;
 pub mod browser;
 pub mod browser_context;
 pub mod browser_type;
+pub mod cdp_session;
 pub mod console_message;
 pub mod dialog;
 pub mod download;
-pub mod artifact;
-pub mod cdp_session;
 pub mod element_handle;
-pub mod locator;
 pub mod file_chooser;
 pub mod frame;
 pub mod js_handle;
+pub mod locator;
 pub mod page;
 pub mod request;
 pub mod response;
@@ -82,40 +82,39 @@ pub mod worker;
 pub use crate::imp::{core::DateTime, utils::*};
 
 pub use self::playwright::Playwright;
-pub use artifact::Artifact;
 pub use accessibility::Accessibility;
+pub use api_request::APIRequest;
+pub use api_request_context::{APIRequestContext, NewContextOptions, RequestData, RequestOptions};
+pub use api_response::APIResponse;
+pub use artifact::Artifact;
 pub use browser::Browser;
 pub use browser_context::BrowserContext;
 pub use browser_type::BrowserType;
-pub use console_message::ConsoleMessage;
 pub use cdp_session::CDPSession;
-pub use api_request::APIRequest;
-pub use api_request_context::{APIRequestContext, RequestOptions, NewContextOptions, RequestData};
-pub use api_response::APIResponse;
+pub use console_message::ConsoleMessage;
 pub use dialog::Dialog;
 pub use download::Download;
-pub use locator::{Locator, FrameLocator};
 pub use element_handle::ElementHandle;
 pub use file_chooser::FileChooser;
 pub use frame::Frame;
 pub use input_device::{Keyboard, Mouse, TouchScreen};
 pub use js_handle::JsHandle;
+pub use locator::{FrameLocator, GetByRoleOptions, Locator};
 pub use page::Page;
 pub use request::Request;
 pub use response::Response;
 pub use route::Route;
 pub use selectors::Selectors;
 pub use tracing::{
-    Tracing,
-    StartOptions as TracingStartOptions,
-    StartChunkOptions as TracingStartChunkOptions,
-    StopOptions as TracingStopOptions,
-    StopChunkOptions as TracingStopChunkOptions
+    StartChunkOptions as TracingStartChunkOptions, StartOptions as TracingStartOptions,
+    StopChunkOptions as TracingStopChunkOptions, StopOptions as TracingStopOptions, Tracing,
 };
-pub use web_error::WebError;
 pub use video::Video;
+pub use web_error::WebError;
 pub use websocket::WebSocket;
-pub use websocket_route::{WebSocketRoute, Side as WebSocketRouteSide, Event as WebSocketRouteEvent};
+pub use websocket_route::{
+    Event as WebSocketRouteEvent, Side as WebSocketRouteSide, WebSocketRoute,
+};
 pub use worker::Worker;
 
 // Artifact

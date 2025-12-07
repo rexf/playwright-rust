@@ -1,18 +1,21 @@
+use crate::api::websocket_route::{Side as WebSocketRouteSide, WebSocketRoute};
 pub use crate::imp::browser_context::EventType;
 use crate::{
-    api::{Browser, Page, Route, Frame, CDPSession, Tracing, WebError, ConsoleMessage, Request, Response, APIRequestContext},
+    api::{
+        APIRequestContext, Browser, CDPSession, ConsoleMessage, Frame, Page, Request, Response,
+        Route, Tracing, WebError,
+    },
     imp::{
         browser_context::{BrowserContext as Impl, Evt},
         core::*,
         prelude::*,
-        utils::{Cookie, Geolocation, StorageState}
+        utils::{Cookie, Geolocation, StorageState},
     },
-    Error
+    Error,
 };
-use std::pin::Pin;
 use regex::Regex;
+use std::pin::Pin;
 use std::{future::Future, sync::Arc};
-use crate::api::websocket_route::{WebSocketRoute, Side as WebSocketRouteSide};
 
 /// BrowserContexts provide a way to operate multiple independent browser sessions.
 ///
@@ -23,7 +26,7 @@ use crate::api::websocket_route::{WebSocketRoute, Side as WebSocketRouteSide};
 /// contexts don't write any browsing data to disk.
 #[derive(Debug)]
 pub struct BrowserContext {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for BrowserContext {
@@ -37,7 +40,9 @@ impl PartialEq for BrowserContext {
 }
 
 impl BrowserContext {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     /// Returns all open pages in the context.
     pub fn pages(&self) -> Result<Vec<Page>, Error> {
@@ -150,7 +155,7 @@ impl BrowserContext {
     pub async fn grant_permissions(
         &self,
         permissions: &[String],
-        origin: Option<&str>
+        origin: Option<&str>,
     ) -> ArcResult<()> {
         upgrade(&self.inner)?
             .grant_permissions(permissions, origin)
@@ -212,7 +217,7 @@ impl BrowserContext {
     /// > NOTE: [`method: BrowserContext.setExtraHTTPHeaders`] does not guarantee the order of headers in the outgoing requests.
     pub async fn set_extra_http_headers<T>(&self, headers: T) -> ArcResult<()>
     where
-        T: IntoIterator<Item = (String, String)>
+        T: IntoIterator<Item = (String, String)>,
     {
         upgrade(&self.inner)?.set_extra_http_headers(headers).await
     }
@@ -226,7 +231,7 @@ impl BrowserContext {
     pub async fn route<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
     where
         F: Fn(Route) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static
+        Fut: Future<Output = ()> + Send + 'static,
     {
         let inner = upgrade(&self.inner)?;
         inner
@@ -235,7 +240,7 @@ impl BrowserContext {
                 Arc::new(move |route| {
                     let route = Route::new(Arc::downgrade(&route));
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
@@ -244,7 +249,7 @@ impl BrowserContext {
     pub async fn route_times<F, Fut>(&self, glob: &str, times: u32, handler: F) -> ArcResult<()>
     where
         F: Fn(Route) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static
+        Fut: Future<Output = ()> + Send + 'static,
     {
         let handler = Arc::new(move |route: Arc<_>| {
             let route = Route::new(Arc::downgrade(&route));
@@ -259,7 +264,7 @@ impl BrowserContext {
     pub async fn route_regex<F, Fut>(&self, regex: &Regex, handler: F) -> ArcResult<()>
     where
         F: Fn(Route) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static
+        Fut: Future<Output = ()> + Send + 'static,
     {
         upgrade(&self.inner)?
             .route_regex(
@@ -268,7 +273,7 @@ impl BrowserContext {
                 Arc::new(move |route| {
                     let route = Route::new(Arc::downgrade(&route));
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
@@ -293,38 +298,36 @@ impl BrowserContext {
     pub async fn route_web_socket<F, Fut>(&self, glob: &str, handler: F) -> ArcResult<()>
     where
         F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static
+        Fut: Future<Output = ()> + Send + 'static,
     {
         let inner = upgrade(&self.inner)?;
         inner
             .route_web_socket(
                 glob,
                 Arc::new(move |route| {
-                    let route = WebSocketRoute::new(Arc::downgrade(&route), WebSocketRouteSide::Page);
+                    let route =
+                        WebSocketRoute::new(Arc::downgrade(&route), WebSocketRouteSide::Page);
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
 
     /// Regex-based websocket routing.
-    pub async fn route_web_socket_regex<F, Fut>(
-        &self,
-        regex: &Regex,
-        handler: F
-    ) -> ArcResult<()>
+    pub async fn route_web_socket_regex<F, Fut>(&self, regex: &Regex, handler: F) -> ArcResult<()>
     where
         F: Fn(WebSocketRoute) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = ()> + Send + 'static
+        Fut: Future<Output = ()> + Send + 'static,
     {
         upgrade(&self.inner)?
             .route_web_socket_regex(
                 regex.as_str(),
                 regex.as_str().contains("(?i)").then_some("i").unwrap_or(""),
                 Arc::new(move |route| {
-                    let route = WebSocketRoute::new(Arc::downgrade(&route), WebSocketRouteSide::Page);
+                    let route =
+                        WebSocketRoute::new(Arc::downgrade(&route), WebSocketRouteSide::Page);
                     Box::pin(handler(route))
-                })
+                }),
             )
             .await
     }
@@ -351,7 +354,7 @@ impl BrowserContext {
     pub async fn close(&self) -> ArcResult<()> {
         let inner = match self.inner.upgrade() {
             None => return Ok(()),
-            Some(inner) => inner
+            Some(inner) => inner,
         };
         inner.close().await
     }
@@ -395,7 +398,7 @@ pub enum Event {
     RequestFinished(Request),
     Response(Response),
     /// Emitted when an unhandled exception occurs in any page within the context.
-    WebError(WebError)
+    WebError(WebError),
 }
 
 impl std::fmt::Debug for Event {
@@ -409,7 +412,7 @@ impl std::fmt::Debug for Event {
             Event::RequestFailed(_) => write!(f, "RequestFailed(..)"),
             Event::RequestFinished(_) => write!(f, "RequestFinished(..)"),
             Event::Response(_) => write!(f, "Response(..)"),
-            Event::WebError(_) => write!(f, "WebError(..)")
+            Event::WebError(_) => write!(f, "WebError(..)"),
         }
     }
 }
@@ -427,7 +430,7 @@ impl PartialEq for Event {
             (RequestFinished(_), RequestFinished(_)) => true,
             (Response(_), Response(_)) => true,
             (WebError(_), WebError(_)) => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -443,7 +446,7 @@ impl From<Evt> for Event {
             Evt::RequestFailed(r) => Event::RequestFailed(Request::new(r)),
             Evt::RequestFinished(r) => Event::RequestFinished(Request::new(r)),
             Evt::Response(r) => Event::Response(Response::new(r)),
-            Evt::WebError(e) => Event::WebError(WebError::new(e))
+            Evt::WebError(e) => Event::WebError(WebError::new(e)),
         }
     }
 }

@@ -3,7 +3,7 @@ use std::path::Path;
 
 #[derive(Debug)]
 pub(crate) struct Tracing {
-    channel: ChannelOwner
+    channel: ChannelOwner,
 }
 
 impl Tracing {
@@ -15,18 +15,11 @@ impl Tracing {
         let name = args.name;
         let title = args.title;
         let _ = send_message!(self, "tracingStart", &args);
-        let _ = send_message!(
-            self,
-            "tracingStartChunk",
-            StartChunkArgs { name, title }
-        );
+        let _ = send_message!(self, "tracingStartChunk", StartChunkArgs { name, title });
         Ok(())
     }
 
-    pub(crate) async fn start_chunk(
-        &self,
-        args: StartChunkArgs<'_, '_>
-    ) -> ArcResult<()> {
+    pub(crate) async fn start_chunk(&self, args: StartChunkArgs<'_, '_>) -> ArcResult<()> {
         let _ = send_message!(self, "tracingStartChunk", args);
         Ok(())
     }
@@ -38,7 +31,7 @@ impl Tracing {
         struct Args<'a> {
             name: &'a str,
             #[serde(rename = "location")]
-            location: Option<&'a str>
+            location: Option<&'a str>,
         }
         let args = Args { name, location };
         let _ = send_message!(self, "tracingGroup", args);
@@ -54,7 +47,7 @@ impl Tracing {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            mode: &'a str
+            mode: &'a str,
         }
         let mode = if path.is_some() { "archive" } else { "discard" };
         let v = send_message!(self, "tracingStopChunk", Args { mode });
@@ -85,7 +78,7 @@ pub(crate) struct StartArgs<'a, 'b> {
     pub title: Option<&'b str>,
     pub screenshots: Option<bool>,
     pub snapshots: Option<bool>,
-    pub sources: Option<bool>
+    pub sources: Option<bool>,
 }
 
 #[skip_serializing_none]
@@ -93,10 +86,14 @@ pub(crate) struct StartArgs<'a, 'b> {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StartChunkArgs<'a, 'b> {
     pub name: Option<&'a str>,
-    pub title: Option<&'b str>
+    pub title: Option<&'b str>,
 }
 
 impl RemoteObject for Tracing {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }

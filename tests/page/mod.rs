@@ -1,6 +1,9 @@
 use super::Which;
 use futures::stream::StreamExt;
-use playwright::api::{page, BrowserContext, Geolocation, Page, Viewport};
+use playwright::api::{
+    page, BrowserContext, DocumentLoadState, Geolocation, Page, Viewport,
+};
+use tokio::time::{timeout, Duration};
 
 macro_rules! concurrent {
     ($which:expr, $($e:expr),*) => {
@@ -17,6 +20,26 @@ pub async fn all(c: &BrowserContext, port: u16, which: Which) {
     eq_context_close(c, &page).await;
     ensure_timeout(&page).await;
     set_timeout(&page).await;
+    context_pages_visibility(c).await;
+    reject_promises_when_page_closed(c).await;
+    beforeunload_runs_when_asked(c, port).await;
+    beforeunload_not_run_by_default(c, port).await;
+    page_close_state(c).await;
+    close_callable_twice(c).await;
+    page_url_should_work(c, port).await;
+    load_events_should_fire(&page, port).await;
+    domcontentloaded_event_should_fire(&page, port).await;
+    opener_should_work(c).await;
+    opener_should_be_null_after_parent_close(c).await;
+    page_url_should_include_hashes(c, port).await;
+    dialog_should_fire(&page).await;
+    dialog_accept_prompt(&page).await;
+    dialog_dismiss_prompt(&page).await;
+    dialog_accept_confirm(&page).await;
+    dialog_dismiss_confirm(&page).await;
+    dialog_auto_dismiss_without_listener(&page).await;
+    wait_for_load_state_should_work(&page, port).await;
+    wait_for_url_should_work(&page, port).await;
     permissions(c, &page, port, which).await;
     if which != Which::Firefox {
         // XXX: go_back response is null on firefox
@@ -27,6 +50,7 @@ pub async fn all(c: &BrowserContext, port: u16, which: Which) {
         which,
         set_extra_http_headers(c, port),
         focus_should_work(c),
+        add_script_tag_includes_source_url(c, port),
         reload_should_worker(c),
         screenshot_should_work(&page),
         title_should_work(&page),
@@ -83,7 +107,7 @@ async fn ensure_close(page: &Page) {
     assert!(received);
     match wait_result.unwrap() {
         page::Event::Close => (),
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
@@ -181,7 +205,7 @@ async fn workers_should_work(c: &BrowserContext, port: u16, which: Which) {
         w.url().unwrap(),
         match which {
             Which::Firefox => "worker.js".to_owned(),
-            _ => js
+            _ => js,
         }
     );
     assert_eq!(
@@ -199,7 +223,7 @@ async fn ensure_timeout(page: &Page) {
     page.set_default_timeout(500).await.unwrap();
     match page.expect_event(page::EventType::Load).await {
         Err(playwright::Error::Timeout) => {}
-        _ => panic!("Not expected")
+        _ => panic!("Not expected"),
     }
 }
 
@@ -236,7 +260,7 @@ async fn permissions(c: &BrowserContext, page: &Page, port: u16, which: Which) {
     c.set_geolocation(Some(&Geolocation {
         latitude: 59.95,
         longitude: 2.,
-        accuracy: None
+        accuracy: None,
     }))
     .await
     .unwrap();
@@ -248,7 +272,7 @@ async fn permissions(c: &BrowserContext, page: &Page, port: u16, which: Which) {
 async fn get_permission(p: &Page, name: &str) -> String {
     p.evaluate(
         "name => navigator.permissions.query({name}).then(result => result.state)",
-        name
+        name,
     )
     .await
     .unwrap()
@@ -258,7 +282,7 @@ async fn viewport(c: &BrowserContext) {
     let p = new(c).await;
     let v = Viewport {
         width: 500,
-        height: 500
+        height: 500,
     };
     dbg!(p.viewport_size().unwrap());
     p.set_viewport_size(v.clone()).await.unwrap();
@@ -281,7 +305,7 @@ async fn download(c: &BrowserContext, port: u16) {
     );
     let download = match d.unwrap() {
         page::Event::Download(d) => d,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
     dbg!(download.url());
     dbg!(download.suggested_filename());
@@ -306,6 +330,32 @@ async fn video(p: &Page) {
     // video.delete().await.unwrap();
 }
 
+async fn add_script_tag_includes_source_url(c: &BrowserContext, port: u16) {
+    // Skips WebKit where upstream behavior differs (mirroring Java @DisabledIf for WebKit).
+    if cfg!(target_os = "macos") {
+        return;
+    }
+    let page = new(c).await;
+    let url = super::url_static(port, "/empty.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    let script_path = std::path::Path::new("tests/server/injectedfile.js");
+    page.add_script_tag_builder("// placeholder")
+        .path(script_path)
+        .add_script_tag()
+        .await
+        .unwrap();
+    let stack: String = page
+        .eval("() => window.__injectedError.stack")
+        .await
+        .unwrap();
+    assert!(
+        stack.contains("injectedfile.js"),
+        "stack should include source URL: {}",
+        stack
+    );
+    close(&page).await;
+}
+
 async fn accessibility(c: &BrowserContext) {
     let p = new(c).await;
     use playwright::api::accessibility::SnapshotResponse;
@@ -314,7 +364,7 @@ async fn accessibility(c: &BrowserContext) {
         r#"<div>\
             <span>Hello World</span>\
             <input placeholder="Empty input" />\
-        </div>"#
+        </div>"#,
     )
     .set_content()
     .await
@@ -355,7 +405,7 @@ async fn accessibility(c: &BrowserContext) {
         haspopup: None,
         invalid: None,
         orientation: None,
-        children: Vec::new()
+        children: Vec::new(),
     });
     assert_eq!(snapshot, input_response);
     let snapshot = ac
@@ -471,7 +521,9 @@ async fn new(c: &BrowserContext) -> Page {
     page
 }
 
-async fn close(p: &Page) { p.close(None).await.unwrap() }
+async fn close(p: &Page) {
+    p.close(None).await.unwrap()
+}
 
 async fn input(c: &BrowserContext) {
     let p = new(c).await;
@@ -491,6 +543,284 @@ async fn input(c: &BrowserContext) {
     close(&p).await;
 }
 
+async fn context_pages_visibility(c: &BrowserContext) {
+    let page = new(c).await;
+    let pages = c.pages().unwrap();
+    assert!(pages.contains(&page));
+    close(&page).await;
+    let pages_after = c.pages().unwrap();
+    assert!(!pages_after.contains(&page));
+}
+
+async fn reject_promises_when_page_closed(c: &BrowserContext) {
+    let page = new(c).await;
+    close(&page).await;
+    let res: Result<i32, _> = page.eval("() => new Promise(r => {})").await;
+    assert!(res.is_err());
+}
+
+async fn close_callable_twice(c: &BrowserContext) {
+    let page = new(c).await;
+    page.close(None).await.unwrap();
+    // Closing again should be a no-op.
+    page.close(None).await.unwrap();
+}
+
+async fn beforeunload_runs_when_asked(c: &BrowserContext, port: u16) {
+    let page = new(c).await;
+    let url = super::url_static(port, "/beforeunload.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    // Ensure we interacted so handler can fire.
+    page.click_builder("body").click().await.ok();
+    let dialog_fut = page.expect_event(page::EventType::Dialog);
+    let close_fut = page.close(Some(true));
+    let (dialog, close_res) = tokio::join!(dialog_fut, close_fut);
+    close_res.unwrap();
+    match dialog.unwrap() {
+        page::Event::Dialog(_) => {}
+        _ => panic!("expected dialog beforeunload"),
+    }
+}
+
+async fn beforeunload_not_run_by_default(c: &BrowserContext, port: u16) {
+    let page = new(c).await;
+    let url = super::url_static(port, "/beforeunload.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    page.click_builder("body").click().await.ok();
+    let dialog_fut = page.expect_event(page::EventType::Dialog);
+    // Close without runBeforeUnload should not emit dialog; expect timeout.
+    page.close(None).await.unwrap();
+    let timed = timeout(Duration::from_millis(500), dialog_fut).await;
+    assert!(
+        timed.is_err(),
+        "dialog should not fire without runBeforeUnload"
+    );
+}
+
+async fn page_close_state(c: &BrowserContext) {
+    let page = new(c).await;
+    let mut rx = page.subscribe_event().unwrap();
+    page.close(None).await.unwrap();
+    let mut saw_close = false;
+    while let Some(Ok(evt)) = timeout(Duration::from_secs(1), rx.next())
+        .await
+        .ok()
+        .flatten()
+    {
+        if let page::Event::Close = evt {
+            saw_close = true;
+            break;
+        }
+    }
+    assert!(saw_close, "close event should be emitted");
+}
+
+async fn page_url_should_work(c: &BrowserContext, port: u16) {
+    let page = new(c).await;
+    assert_eq!(page.url().unwrap(), "about:blank");
+    let url = super::url_static(port, "/empty.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    assert_eq!(page.url().unwrap(), url);
+    close(&page).await;
+}
+
+async fn load_events_should_fire(page: &Page, port: u16) {
+    let mut rx = page.subscribe_event().unwrap();
+    let url = super::url_static(port, "/empty.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    let evt = timeout(Duration::from_secs(5), rx.next())
+        .await
+        .ok()
+        .flatten()
+        .and_then(Result::ok);
+    assert!(matches!(evt, Some(page::Event::Load)));
+}
+
+async fn domcontentloaded_event_should_fire(page: &Page, port: u16) {
+    let mut rx = page.subscribe_event().unwrap();
+    let url = super::url_static(port, "/empty.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    // wait for both domcontentloaded and load; ensure domcontentloaded shows up
+    let mut saw_dcl = false;
+    for _ in 0..3 {
+        if let Some(Ok(evt)) = timeout(Duration::from_secs(5), rx.next())
+            .await
+            .ok()
+            .flatten()
+        {
+            if let page::Event::DomContentLoaded = evt {
+                saw_dcl = true;
+                break;
+            }
+        }
+    }
+    assert!(saw_dcl, "domcontentloaded should fire");
+}
+
+async fn wait_for_load_state_should_work(page: &Page, port: u16) {
+    let url = super::url_static(port, "/empty.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    page.wait_for_load_state(None, Some(5_000.0)).await.unwrap();
+    page.wait_for_load_state(Some(DocumentLoadState::DomContentLoaded), Some(5_000.0))
+        .await
+        .unwrap();
+}
+
+async fn wait_for_url_should_work(page: &Page, port: u16) {
+    let url = super::url_static(port, "/empty.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    page.wait_for_url(&url, Some(DocumentLoadState::Load), Some(5_000.0))
+        .await
+        .unwrap();
+    // Hash change should also be observable
+    page.eval::<()>("() => { window.location.hash = 'dynamic'; }")
+        .await
+        .unwrap();
+    let target = format!("{url}#dynamic");
+    page.wait_for_url(&target, Some(DocumentLoadState::Commit), Some(5_000.0))
+        .await
+        .unwrap();
+}
+
+async fn dialog_should_fire(page: &Page) {
+    let dialog = page.expect_event(page::EventType::Dialog);
+    page.eval::<()>("() => alert('yo')").await.unwrap();
+    match dialog.await.unwrap() {
+        page::Event::Dialog(dialog) => {
+            assert_eq!(dialog.r#type().unwrap(), "alert");
+            assert_eq!(dialog.default_value().unwrap(), "");
+            assert_eq!(dialog.message().unwrap(), "yo");
+            dialog.accept(None).await.unwrap();
+        }
+        _ => unreachable!(),
+    }
+}
+
+async fn dialog_accept_prompt(page: &Page) {
+    let dialog = page.expect_event(page::EventType::Dialog);
+    let handle_dialog = async move {
+        match dialog.await.unwrap() {
+            page::Event::Dialog(dialog) => {
+                assert_eq!(dialog.r#type().unwrap(), "prompt");
+                assert_eq!(dialog.default_value().unwrap(), "yes.");
+                assert_eq!(dialog.message().unwrap(), "question?");
+                dialog.accept(Some("answer!")).await.unwrap();
+            }
+            _ => unreachable!(),
+        }
+    };
+    let (res, _) = tokio::join!(
+        async {
+            page.eval::<String>("() => prompt('question?', 'yes.')")
+                .await
+                .unwrap()
+        },
+        handle_dialog
+    );
+    assert_eq!(res, "answer!");
+}
+
+async fn dialog_dismiss_prompt(page: &Page) {
+    let dialog = page.expect_event(page::EventType::Dialog);
+    let handle_dialog = async move {
+        if let page::Event::Dialog(dialog) = dialog.await.unwrap() {
+            dialog.dismiss().await.unwrap();
+        }
+    };
+    let (res, _) = tokio::join!(
+        async { page.eval::<Option<String>>("() => prompt('question?')").await.unwrap() },
+        handle_dialog
+    );
+    assert!(res.is_none());
+}
+
+async fn dialog_accept_confirm(page: &Page) {
+    let dialog = page.expect_event(page::EventType::Dialog);
+    let handle_dialog = async move {
+        if let page::Event::Dialog(dialog) = dialog.await.unwrap() {
+            dialog.accept(None).await.unwrap();
+        }
+    };
+    let (res, _) = tokio::join!(
+        async { page.eval::<bool>("() => confirm('boolean?')").await.unwrap() },
+        handle_dialog
+    );
+    assert!(res);
+}
+
+async fn dialog_dismiss_confirm(page: &Page) {
+    let dialog = page.expect_event(page::EventType::Dialog);
+    let handle_dialog = async move {
+        if let page::Event::Dialog(dialog) = dialog.await.unwrap() {
+            dialog.dismiss().await.unwrap();
+        }
+    };
+    let (res, _) = tokio::join!(
+        async { page.eval::<bool>("() => confirm('boolean?')").await.unwrap() },
+        handle_dialog
+    );
+    assert!(!res);
+}
+
+async fn dialog_auto_dismiss_without_listener(page: &Page) {
+    let result: Option<String> = page
+        .eval("() => prompt('question?')")
+        .await
+        .unwrap();
+    assert!(result.is_none());
+    page.set_content_builder("<div onclick='window.alert(123); window._clicked=true'>Click me</div>")
+        .set_content()
+        .await
+        .unwrap();
+    page.click_builder("div").click().await.unwrap();
+    let clicked: bool = page.eval("() => window._clicked").await.unwrap();
+    assert!(clicked);
+}
+
+async fn opener_should_work(c: &BrowserContext) {
+    let page = new(c).await;
+    let (popup_evt, _) = tokio::join!(
+        page.expect_event(page::EventType::Popup),
+        page.eval::<()>("() => window.open('about:blank')")
+    );
+    let popup = match popup_evt.unwrap() {
+        page::Event::Popup(p) => p,
+        _ => unreachable!(),
+    };
+    let opener = popup.opener().await.unwrap();
+    assert_eq!(opener.as_ref(), Some(&page));
+    close(&popup).await;
+    close(&page).await;
+}
+
+async fn opener_should_be_null_after_parent_close(c: &BrowserContext) {
+    let page = new(c).await;
+    let (popup_evt, _) = tokio::join!(
+        page.expect_event(page::EventType::Popup),
+        page.eval::<()>("() => window.open('about:blank')")
+    );
+    let popup = match popup_evt.unwrap() {
+        page::Event::Popup(p) => p,
+        _ => unreachable!(),
+    };
+    page.close(None).await.unwrap();
+    let opener = popup.opener().await.unwrap();
+    assert!(opener.is_none());
+    close(&popup).await;
+}
+
+async fn page_url_should_include_hashes(c: &BrowserContext, port: u16) {
+    let page = new(c).await;
+    let url = super::url_static(port, "/empty.html");
+    page.goto_builder(&url).goto().await.unwrap();
+    assert_eq!(page.url().unwrap(), url);
+    page.eval::<()>("() => { window.location.hash = 'dynamic'; }")
+        .await
+        .unwrap();
+    assert_eq!(page.url().unwrap(), format!("{url}#dynamic"));
+    close(&page).await;
+}
+
 async fn set_extra_http_headers(c: &BrowserContext, port: u16) {
     let p = new(c).await;
     p.set_extra_http_headers(vec![("hoge".into(), "hoge".into())])
@@ -503,7 +833,7 @@ async fn set_extra_http_headers(c: &BrowserContext, port: u16) {
     );
     let req = match maybe_request.unwrap() {
         page::Event::Request(req) => req,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
     let headers = req.headers().unwrap();
     assert_eq!(headers.get("foo").unwrap(), "bar"); // set by BrowserContext

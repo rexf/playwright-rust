@@ -4,7 +4,7 @@ use crate::imp::{core::*, js_handle::JsHandle, prelude::*, utils::SourceLocation
 pub(crate) struct ConsoleMessage {
     channel: ChannelOwner,
     location: SourceLocation,
-    args: Vec<Weak<JsHandle>>
+    args: Vec<Weak<JsHandle>>,
 }
 
 impl ConsoleMessage {
@@ -12,7 +12,7 @@ impl ConsoleMessage {
         #[derive(Deserialize)]
         struct De {
             location: SourceLocation,
-            args: Vec<OnlyGuid>
+            args: Vec<OnlyGuid>,
         }
         let De { location, args } = serde_json::from_value(channel.initializer.clone())?;
         let args = args
@@ -22,7 +22,7 @@ impl ConsoleMessage {
         Ok(Self {
             channel,
             location,
-            args
+            args,
         })
     }
 
@@ -42,12 +42,20 @@ impl ConsoleMessage {
             .unwrap_or_default()
     }
 
-    pub(crate) fn location(&self) -> &SourceLocation { &self.location }
+    pub(crate) fn location(&self) -> &SourceLocation {
+        &self.location
+    }
 
-    pub(crate) fn args(&self) -> &[Weak<JsHandle>] { &self.args }
+    pub(crate) fn args(&self) -> &[Weak<JsHandle>] {
+        &self.args
+    }
 }
 
 impl RemoteObject for ConsoleMessage {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }

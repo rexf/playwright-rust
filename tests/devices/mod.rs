@@ -1,7 +1,7 @@
 use super::Which;
 use playwright::{
     api::{page, Page, Viewport},
-    Playwright
+    Playwright,
 };
 
 pub async fn all(playwright: &Playwright, port: u16, _which: Which) {
@@ -34,7 +34,7 @@ pub async fn all(playwright: &Playwright, port: u16, _which: Which) {
 
 async fn check_size(page: &Page) {
     page.set_content_builder(
-        r#"<meta name="viewport" content="width=device-width, user-scalable=no" />"#
+        r#"<meta name="viewport" content="width=device-width, user-scalable=no" />"#,
     )
     .set_content()
     .await
@@ -86,7 +86,7 @@ async fn check_user_agent(page: &Page, port: u16) {
     );
     let request = match result.unwrap() {
         page::Event::Request(request) => request,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
     dbg!(&request.headers().unwrap());
     assert_eq!(request.headers().unwrap()["user-agent"], user_agent);

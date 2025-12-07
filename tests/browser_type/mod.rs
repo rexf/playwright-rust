@@ -5,7 +5,7 @@ pub async fn all(playwright: &Playwright, which: Which) -> BrowserType {
     let t = match which {
         Which::Webkit => playwright.webkit(),
         Which::Firefox => playwright.firefox(),
-        Which::Chromium => playwright.chromium()
+        Which::Chromium => playwright.chromium(),
     };
     name_should_work(&t, which);
     executable_should_exist(&t);
@@ -19,7 +19,7 @@ fn name_should_work(t: &BrowserType, which: Which) {
     match which {
         Which::Webkit => assert_eq!(name, "webkit"),
         Which::Firefox => assert_eq!(name, "firefox"),
-        Which::Chromium => assert_eq!(name, "chromium")
+        Which::Chromium => assert_eq!(name, "chromium"),
     }
 }
 

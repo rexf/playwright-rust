@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>beforeunload</title>
+    <script>
+      window.addEventListener('beforeunload', (event) => {
+        event.preventDefault();
+        event.returnValue = '';
+        return '';
+      });
+    </script>
+  </head>
+  <body>
+    <p>beforeunload page</p>
+  </body>
+</html>

@@ -4,8 +4,8 @@ use crate::{
     imp::{
         core::*,
         page::{AccessibilitySnapshotArgs as SnapshotArgs, Page as PageImpl},
-        prelude::*
-    }
+        prelude::*,
+    },
 };
 
 /// The Accessibility class provides methods for inspecting Chromium's accessibility tree. The accessibility tree is used by
@@ -23,11 +23,13 @@ use crate::{
 /// only the "interesting" nodes of the tree.
 #[derive(Debug, Clone)]
 pub struct Accessibility {
-    inner: Weak<PageImpl>
+    inner: Weak<PageImpl>,
 }
 
 impl Accessibility {
-    pub(crate) fn new(inner: Weak<PageImpl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<PageImpl>) -> Self {
+        Self { inner }
+    }
 
     /// Captures the current state of the accessibility tree. The returned object represents the root accessible node of the
     /// page.
@@ -63,12 +65,14 @@ impl Accessibility {
     /// if(focusedNode != null)
     ///  Console.WriteLine(focusedNode.Name);
     /// ```
-    pub fn snapshot_builder(&self) -> SnapshotBuilder { SnapshotBuilder::new(self.inner.clone()) }
+    pub fn snapshot_builder(&self) -> SnapshotBuilder {
+        SnapshotBuilder::new(self.inner.clone())
+    }
 }
 
 pub struct SnapshotBuilder {
     inner: Weak<PageImpl>,
-    args: SnapshotArgs
+    args: SnapshotArgs,
 }
 
 impl SnapshotBuilder {

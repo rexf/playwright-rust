@@ -2,7 +2,7 @@ pub use crate::imp::playwright::DeviceDescriptor;
 use crate::{
     api::{api_request::APIRequest, browser_type::BrowserType, selectors::Selectors},
     imp::{core::*, playwright::Playwright as Impl, prelude::*},
-    Error
+    Error,
 };
 use std::{io, process::Command, time::Duration};
 use tokio::time::timeout;
@@ -11,7 +11,7 @@ use tokio::time::timeout;
 pub struct Playwright {
     driver: Driver,
     _conn: Connection,
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 fn run(driver: &Driver, args: &'static [&'static str]) -> io::Result<()> {
@@ -19,7 +19,7 @@ fn run(driver: &Driver, args: &'static [&'static str]) -> io::Result<()> {
     if !status.success() {
         return Err(io::Error::new(
             io::ErrorKind::Other,
-            format!("Exit with {}", status)
+            format!("Exit with {}", status),
         ));
     }
     Ok(())
@@ -40,19 +40,27 @@ impl Playwright {
         Ok(Self {
             driver,
             _conn: conn,
-            inner: p
+            inner: p,
         })
     }
 
     /// Runs $ playwright install
-    pub fn prepare(&self) -> io::Result<()> { run(&self.driver, &["install"]) }
+    pub fn prepare(&self) -> io::Result<()> {
+        run(&self.driver, &["install"])
+    }
 
     /// Runs $ playwright install chromium
-    pub fn install_chromium(&self) -> io::Result<()> { run(&self.driver, &["install", "chromium"]) }
+    pub fn install_chromium(&self) -> io::Result<()> {
+        run(&self.driver, &["install", "chromium"])
+    }
 
-    pub fn install_firefox(&self) -> io::Result<()> { run(&self.driver, &["install", "firefox"]) }
+    pub fn install_firefox(&self) -> io::Result<()> {
+        run(&self.driver, &["install", "firefox"])
+    }
 
-    pub fn install_webkit(&self) -> io::Result<()> { run(&self.driver, &["install", "webkit"]) }
+    pub fn install_webkit(&self) -> io::Result<()> {
+        run(&self.driver, &["install", "webkit"])
+    }
 
     /// Launcher
     pub fn chromium(&self) -> BrowserType {
@@ -72,17 +80,19 @@ impl Playwright {
         BrowserType::new(inner)
     }
 
-    pub fn driver(&mut self) -> &mut Driver { &mut self.driver }
+    pub fn driver(&mut self) -> &mut Driver {
+        &mut self.driver
+    }
 
     pub fn selectors(&self) -> Selectors {
-        let inner = weak_and_then(&self.inner, |rc| {
-            rc.selectors().unwrap_or_else(Weak::new)
-        });
+        let inner = weak_and_then(&self.inner, |rc| rc.selectors().unwrap_or_else(Weak::new));
         Selectors::new(inner)
     }
 
     /// Exposes API for Web API testing.
-    pub fn request(&self) -> APIRequest { APIRequest::new(self.inner.clone()) }
+    pub fn request(&self) -> APIRequest {
+        APIRequest::new(self.inner.clone())
+    }
 
     /// Returns a dictionary of devices to be used with [`method: Browser.newContext`] or [`method: Browser.newPage`].
     ///

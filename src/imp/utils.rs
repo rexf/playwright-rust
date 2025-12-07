@@ -4,7 +4,7 @@ use base64::{engine::general_purpose, Engine as _};
 #[derive(Debug, Deserialize, Clone, Serialize, PartialEq, Eq)]
 pub struct Viewport {
     pub width: i32,
-    pub height: i32
+    pub height: i32,
 }
 
 #[skip_serializing_none]
@@ -15,7 +15,7 @@ pub struct ProxySettings {
     /// Optional coma-separated domains to bypass proxy, for example `\".com, chromium.org, .domain.com\"`.
     pub bypass: Option<String>,
     pub username: Option<String>,
-    pub password: Option<String>
+    pub password: Option<String>,
 }
 
 #[skip_serializing_none]
@@ -26,13 +26,13 @@ pub struct Geolocation {
     /// Longitude between -180 and 180.
     pub longitude: f64,
     /// Non-negative accuracy value. Defaults to `0`.
-    pub accuracy: Option<f64>
+    pub accuracy: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct HttpCredentials {
     pub username: String,
-    pub password: String
+    pub password: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy)]
@@ -40,14 +40,14 @@ pub struct HttpCredentials {
 pub enum ColorScheme {
     Dark,
     Light,
-    NoPreference
+    NoPreference,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Deserialize, Serialize)]
 pub struct StorageState {
     pub cookies: Option<Vec<Cookie>>,
-    pub origins: Option<Vec<OriginState>>
+    pub origins: Option<Vec<OriginState>>,
 }
 
 #[skip_serializing_none]
@@ -63,7 +63,7 @@ pub struct Cookie {
     pub expires: Option<f64>,
     pub http_only: Option<bool>,
     pub secure: Option<bool>,
-    pub same_site: Option<SameSite>
+    pub same_site: Option<SameSite>,
 }
 
 impl Cookie {
@@ -77,7 +77,7 @@ impl Cookie {
             expires: None,
             http_only: None,
             secure: None,
-            same_site: None
+            same_site: None,
         }
     }
 
@@ -91,7 +91,7 @@ impl Cookie {
             expires: None,
             http_only: None,
             secure: None,
-            same_site: None
+            same_site: None,
         }
     }
 }
@@ -100,21 +100,21 @@ impl Cookie {
 pub enum SameSite {
     Lax,
     None,
-    Strict
+    Strict,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct OriginState {
     pub origin: String,
-    pub local_storage: Vec<LocalStorageEntry>
+    pub local_storage: Vec<LocalStorageEntry>,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LocalStorageEntry {
     pub name: String,
-    pub value: String
+    pub value: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy, Hash)]
@@ -123,7 +123,7 @@ pub enum DocumentLoadState {
     DomContentLoaded,
     Load,
     NetworkIdle,
-    Commit
+    Commit,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy)]
@@ -131,7 +131,7 @@ pub enum KeyboardModifier {
     Alt,
     Control,
     Meta,
-    Shift
+    Shift,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy)]
@@ -139,17 +139,19 @@ pub enum KeyboardModifier {
 pub enum MouseButton {
     Left,
     Middle,
-    Right
+    Right,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Copy)]
 pub struct Position {
     pub x: f64,
-    pub y: f64
+    pub y: f64,
 }
 
 impl From<(f64, f64)> for Position {
-    fn from((x, y): (f64, f64)) -> Self { Self { x, y } }
+    fn from((x, y): (f64, f64)) -> Self {
+        Self { x, y }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone, Copy)]
@@ -159,14 +161,14 @@ pub struct FloatRect {
     pub y: f64,
     /// the width of the element in pixels.
     pub width: f64,
-    pub height: f64
+    pub height: f64,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
 pub enum ScreenshotType {
     Jpeg,
-    Png
+    Png,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy)]
@@ -177,7 +179,7 @@ pub enum ElementState {
     Enabled,
     Hidden,
     Stable,
-    Visible
+    Visible,
 }
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone, Copy)]
@@ -186,36 +188,44 @@ pub enum WaitForSelectorState {
     Attached,
     Detached,
     Visible,
-    Hidden
+    Hidden,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct Header {
     pub name: String,
-    pub value: String
+    pub value: String,
 }
 
 impl From<Header> for (String, String) {
-    fn from(Header { name, value }: Header) -> Self { (name, value) }
+    fn from(Header { name, value }: Header) -> Self {
+        (name, value)
+    }
 }
 
 impl From<(String, String)> for Header {
-    fn from((k, v): (String, String)) -> Self { Self { name: k, value: v } }
+    fn from((k, v): (String, String)) -> Self {
+        Self { name: k, value: v }
+    }
 }
 
 #[derive(Debug, Serialize, PartialEq, Clone)]
 #[serde(untagged)]
 pub enum Length<'a> {
     Value(f64),
-    WithUnit(&'a str)
+    WithUnit(&'a str),
 }
 
 impl<'a> From<f64> for Length<'a> {
-    fn from(x: f64) -> Self { Self::Value(x) }
+    fn from(x: f64) -> Self {
+        Self::Value(x)
+    }
 }
 
 impl<'a> From<&'a str> for Length<'a> {
-    fn from(x: &'a str) -> Self { Self::WithUnit(x) }
+    fn from(x: &'a str) -> Self {
+        Self::WithUnit(x)
+    }
 }
 
 #[skip_serializing_none]
@@ -224,14 +234,14 @@ pub struct PdfMargins<'a, 'b, 'c, 'd> {
     pub top: Option<Length<'a>>,
     pub right: Option<Length<'b>>,
     pub bottom: Option<Length<'c>>,
-    pub left: Option<Length<'d>>
+    pub left: Option<Length<'d>>,
 }
 
 #[derive(Debug, Serialize, PartialEq)]
 pub struct File {
     pub name: String,
     pub mime: String,
-    pub buffer: String
+    pub buffer: String,
 }
 
 impl File {
@@ -253,7 +263,7 @@ pub enum BrowserChannel {
     MsedgeBeta,
     MsedgeDev,
     MsedgeCanary,
-    FirefoxStable
+    FirefoxStable,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -263,7 +273,7 @@ pub struct SourceLocation {
     /// 0-based line number in the resource.
     pub line_number: i32,
     /// 0-based column number in the resource.
-    pub column_number: i32
+    pub column_number: i32,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq)]
@@ -284,5 +294,5 @@ pub struct ResponseTiming {
     /// Time immediately before the browser starts requesting the resource from the server, cache, or local resource. The value\nis given in milliseconds relative to `startTime`, -1 if not available.
     pub request_start: f64,
     /// Time immediately after the browser starts requesting the resource from the server, cache, or local resource. The value\nis given in milliseconds relative to `startTime`, -1 if not available.
-    pub response_start: f64
+    pub response_start: f64,
 }

@@ -1,14 +1,14 @@
 use super::Which;
 use playwright::api::{
     browser::RecordVideo, Browser, BrowserContext, BrowserType, Cookie, LocalStorageEntry,
-    OriginState, StorageState
+    OriginState, StorageState,
 };
 
 pub async fn all(
     browser: &Browser,
     persistent: &BrowserContext,
     port: u16,
-    _which: Which
+    _which: Which,
 ) -> BrowserContext {
     let c = launch(browser).await;
     assert_ne!(persistent, &c);
@@ -40,21 +40,21 @@ async fn launch(b: &Browser) -> BrowserContext {
         .has_touch(true)
         .record_video(RecordVideo {
             dir: &super::temp_dir().join("video"),
-            size: None
+            size: None,
         })
         .storage_state(StorageState {
             cookies: Some(vec![Cookie::with_url(
                 "name1",
                 "value1",
-                "https://example.com"
+                "https://example.com",
             )]),
             origins: Some(vec![OriginState {
                 origin: "https://example.com".into(),
                 local_storage: vec![LocalStorageEntry {
                     name: "name1".into(),
-                    value: "value1".into()
-                }]
-            }])
+                    value: "value1".into(),
+                }],
+            }]),
         })
         .build()
         .await
@@ -99,7 +99,7 @@ async fn cookies_should_work(c: &BrowserContext) {
         expires: None,
         http_only: None,
         secure: None,
-        same_site: None
+        same_site: None,
     };
     c.add_cookies(&[cookie.clone()]).await.unwrap();
     let cookies = c.cookies(&[]).await.unwrap();
@@ -126,7 +126,7 @@ async fn get_permission(c: &BrowserContext, name: &str) -> String {
     let res = p
         .evaluate(
             "name => navigator.permissions.query({name}).then(result => result.state)",
-            name
+            name,
         )
         .await
         .unwrap();

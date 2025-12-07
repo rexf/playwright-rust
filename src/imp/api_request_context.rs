@@ -4,7 +4,7 @@ use base64::{engine::general_purpose, Engine as _};
 /// Remote representation of Playwright APIRequestContext used for API testing.
 #[derive(Debug)]
 pub(crate) struct APIRequestContext {
-    channel: ChannelOwner
+    channel: ChannelOwner,
 }
 
 impl APIRequestContext {
@@ -15,12 +15,8 @@ impl APIRequestContext {
     /// Low-level fetch that mirrors the driver API.
     pub(crate) async fn fetch(&self, args: FetchArgs) -> ArcResult<APIResponsePayload> {
         let v = send_message!(self, "fetch", args);
-        let response = v
-            .get("response")
-            .ok_or(Error::InvalidParams)?
-            .clone();
-        let payload: APIResponsePayload =
-            serde_json::from_value(response).map_err(Error::Serde)?;
+        let response = v.get("response").ok_or(Error::InvalidParams)?.clone();
+        let payload: APIResponsePayload = serde_json::from_value(response).map_err(Error::Serde)?;
         Ok(payload)
     }
 
@@ -28,7 +24,7 @@ impl APIRequestContext {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            fetch_uid: &'a str
+            fetch_uid: &'a str,
         }
         let v = send_message!(self, "fetchResponseBody", Args { fetch_uid });
         let b64 = v
@@ -45,7 +41,7 @@ impl APIRequestContext {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            fetch_uid: &'a str
+            fetch_uid: &'a str,
         }
         let v = send_message!(self, "fetchLog", Args { fetch_uid });
         let entries = v
@@ -62,7 +58,7 @@ impl APIRequestContext {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            fetch_uid: &'a str
+            fetch_uid: &'a str,
         }
         let _ = send_message!(self, "disposeAPIResponse", Args { fetch_uid });
         Ok(())
@@ -78,7 +74,7 @@ impl APIRequestContext {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            reason: Option<&'a str>
+            reason: Option<&'a str>,
         }
         let _ = send_message!(self, "dispose", Args { reason });
         Ok(())
@@ -86,8 +82,12 @@ impl APIRequestContext {
 }
 
 impl RemoteObject for APIRequestContext {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 #[skip_serializing_none]
@@ -106,20 +106,20 @@ pub(crate) struct FetchArgs {
     pub ignore_https_errors: Option<bool>,
     pub max_redirects: Option<i32>,
     pub max_retries: Option<i32>,
-    pub timeout: Option<f64>
+    pub timeout: Option<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct NameValue {
     pub name: String,
-    pub value: String
+    pub value: String,
 }
 
 impl NameValue {
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            value: value.into()
+            value: value.into(),
         }
     }
 }
@@ -131,7 +131,7 @@ pub(crate) struct MultipartField {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub file: Option<FilePayload>
+    pub file: Option<FilePayload>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -139,7 +139,7 @@ pub(crate) struct MultipartField {
 pub(crate) struct FilePayload {
     pub name: String,
     pub mime_type: Option<String>,
-    pub buffer: String
+    pub buffer: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -149,7 +149,7 @@ pub(crate) struct APIResponsePayload {
     pub url: String,
     pub status: i32,
     pub status_text: String,
-    pub headers: Vec<Header>
+    pub headers: Vec<Header>,
 }
 
 #[skip_serializing_none]
@@ -164,5 +164,5 @@ pub(crate) struct NewContextArgs {
     pub fail_on_status_code: Option<bool>,
     pub proxy: Option<crate::imp::utils::ProxySettings>,
     pub storage_state: Option<Value>,
-    pub http_credentials: Option<crate::imp::utils::HttpCredentials>
+    pub http_credentials: Option<crate::imp::utils::HttpCredentials>,
 }

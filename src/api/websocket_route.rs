@@ -2,19 +2,19 @@ use crate::imp::{
     core::*,
     prelude::*,
     websocket::Buffer,
-    websocket_route::{Evt as ImplEvt, WebSocketRoute as Impl}
+    websocket_route::{Evt as ImplEvt, WebSocketRoute as Impl},
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
     Page,
-    Server
+    Server,
 }
 
 #[derive(Clone)]
 pub struct WebSocketRoute {
     inner: Weak<Impl>,
-    side: Side
+    side: Side,
 }
 
 impl PartialEq for WebSocketRoute {
@@ -28,9 +28,13 @@ impl PartialEq for WebSocketRoute {
 }
 
 impl WebSocketRoute {
-    pub(crate) fn new(inner: Weak<Impl>, side: Side) -> Self { Self { inner, side } }
+    pub(crate) fn new(inner: Weak<Impl>, side: Side) -> Self {
+        Self { inner, side }
+    }
 
-    pub fn url(&self) -> Result<String, Error> { Ok(upgrade(&self.inner)?.url().to_owned()) }
+    pub fn url(&self) -> Result<String, Error> {
+        Ok(upgrade(&self.inner)?.url().to_owned())
+    }
 
     pub async fn connect_to_server(&self) -> ArcResult<WebSocketRoute> {
         if self.side == Side::Server {
@@ -44,7 +48,7 @@ impl WebSocketRoute {
         let inner = upgrade(&self.inner)?;
         match self.side {
             Side::Page => inner.send_to_page_text(message).await,
-            Side::Server => inner.send_to_server_text(message).await
+            Side::Server => inner.send_to_server_text(message).await,
         }
     }
 
@@ -52,7 +56,7 @@ impl WebSocketRoute {
         let inner = upgrade(&self.inner)?;
         match self.side {
             Side::Page => inner.send_to_page_bytes(bytes).await,
-            Side::Server => inner.send_to_server_bytes(bytes).await
+            Side::Server => inner.send_to_server_bytes(bytes).await,
         }
     }
 
@@ -60,7 +64,7 @@ impl WebSocketRoute {
         let inner = upgrade(&self.inner)?;
         match self.side {
             Side::Page => inner.close_page(code, reason).await,
-            Side::Server => inner.close_server(code, reason).await
+            Side::Server => inner.close_server(code, reason).await,
         }
     }
 
@@ -74,13 +78,13 @@ pub enum Event {
     CloseFromPage {
         code: i32,
         reason: String,
-        was_clean: bool
+        was_clean: bool,
     },
     CloseFromServer {
         code: i32,
         reason: String,
-        was_clean: bool
-    }
+        was_clean: bool,
+    },
 }
 
 impl From<ImplEvt> for Event {
@@ -91,21 +95,21 @@ impl From<ImplEvt> for Event {
             ImplEvt::CloseFromPage {
                 code,
                 reason,
-                was_clean
+                was_clean,
             } => Event::CloseFromPage {
                 code,
                 reason,
-                was_clean
+                was_clean,
             },
             ImplEvt::CloseFromServer {
                 code,
                 reason,
-                was_clean
+                was_clean,
             } => Event::CloseFromServer {
                 code,
                 reason,
-                was_clean
-            }
+                was_clean,
+            },
         }
     }
 }

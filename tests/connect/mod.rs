@@ -7,7 +7,7 @@ pub(super) async fn connect_over_cdp(which: Which) {
     install_browser(&playwright, which);
     let browser_type = match which {
         Which::Chromium => playwright.chromium(),
-        _ => return
+        _ => return,
     };
 
     http(&browser_type).await;
@@ -97,16 +97,16 @@ async fn fetch_ws_endpoint(browser_type: &BrowserType, port: u16) -> String {
     goto.unwrap();
     let response = match event {
         Ok(page::Event::Response(res)) => res,
-        _ => unreachable!()
+        _ => unreachable!(),
     };
     let text = response.text().await.unwrap();
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct De<'a> {
-        web_socket_debugger_url: &'a str
+        web_socket_debugger_url: &'a str,
     }
     let De {
-        web_socket_debugger_url
+        web_socket_debugger_url,
     } = serde_json::from_str(&text).unwrap();
     web_socket_debugger_url.into()
 }

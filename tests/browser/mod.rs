@@ -45,7 +45,7 @@ fn version_should_work(b: &Browser, which: Which) {
             let c: char = s.chars().next().unwrap();
             match c {
                 '0'..='9' => {}
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
     }

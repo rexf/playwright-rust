@@ -1,9 +1,9 @@
 use crate::imp::{
     api_request_context::APIRequestContext,
-    cdp_session::CDPSession,
     browser::Browser,
-    core::*,
+    cdp_session::CDPSession,
     console_message::ConsoleMessage,
+    core::*,
     frame::Frame,
     page::Page,
     prelude::*,
@@ -13,11 +13,13 @@ use crate::imp::{
     tracing::Tracing,
     utils::{Cookie, Geolocation, Header, StorageState},
     web_error::WebError,
-    websocket_route::WebSocketRoute
+    websocket_route::WebSocketRoute,
 };
 use futures::future::BoxFuture;
-use std::fmt;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::fmt;
 
 pub(crate) type RouteHandler =
     Arc<dyn Fn(Arc<Route>) -> BoxFuture<'static, ()> + Send + Sync + 'static>;
@@ -26,31 +28,31 @@ pub(crate) type WebSocketRouteHandler =
 #[derive(Clone)]
 enum RoutePattern {
     Glob(String),
-    Regex(String, String) // source, flags
+    Regex(String, String), // source, flags
 }
 
 #[derive(Clone)]
 enum WebSocketRoutePattern {
     Glob(String),
-    Regex(String, String)
+    Regex(String, String),
 }
 
 #[derive(Clone)]
 struct RouteEntry {
     pattern: RoutePattern,
     handler: RouteHandler,
-    times: Option<u32>
+    times: Option<u32>,
 }
 
 #[derive(Clone)]
 struct WebSocketRouteEntry {
     pattern: WebSocketRoutePattern,
-    handler: WebSocketRouteHandler
+    handler: WebSocketRouteHandler,
 }
 pub(crate) struct BrowserContext {
     channel: ChannelOwner,
     var: Mutex<Variable>,
-    tx: Mutex<Option<broadcast::Sender<Evt>>>
+    tx: Mutex<Option<broadcast::Sender<Evt>>>,
 }
 
 #[derive(Default)]
@@ -62,13 +64,13 @@ pub(crate) struct Variable {
     routes: Vec<RouteEntry>,
     websocket_routes: Vec<WebSocketRouteEntry>,
     tracing: Option<Weak<Tracing>>,
-    request_context: Option<Weak<APIRequestContext>>
+    request_context: Option<Weak<APIRequestContext>>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SerializedError {
-    error: Option<InnerError>
+    error: Option<InnerError>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,7 +78,23 @@ struct SerializedError {
 struct InnerError {
     name: Option<String>,
     message: Option<String>,
-    stack: Option<String>
+    stack: Option<String>,
+}
+
+fn guid_from_keys(params: &Map<String, Value>, keys: &[&str]) -> Result<OnlyGuid, Error> {
+    for key in keys {
+        if let Some(v) = params.get(*key) {
+            return serde_json::from_value(v.clone()).map_err(|_| Error::InvalidParams);
+        }
+    }
+
+    if params.len() == 1 {
+        if let Some(first) = first_object(params) {
+            return serde_json::from_value((*first).clone()).map_err(|_| Error::InvalidParams);
+        }
+    }
+
+    Err(Error::InvalidParams)
 }
 
 fn format_error_value(v: &Value) -> Result<String, Error> {
@@ -84,7 +102,7 @@ fn format_error_value(v: &Value) -> Result<String, Error> {
     if let Some(InnerError {
         name,
         message,
-        stack
+        stack,
     }) = error
     {
         let mut s = String::new();
@@ -120,11 +138,11 @@ impl BrowserContext {
         );
         let Initializer {
             tracing,
-            request_context
+            request_context,
         } = serde_json::from_value(channel.initializer.clone())?;
         let browser = match &channel.parent {
             Some(RemoteWeak::Browser(b)) => Some(b.clone()),
-            _ => None
+            _ => None,
         };
         let var = Mutex::new(Variable {
             browser,
@@ -132,7 +150,7 @@ impl BrowserContext {
                 let ctx = upgrade(&channel.ctx).ok()?;
                 let ctx_locked = match ctx.try_lock() {
                     Ok(l) => l,
-                    Err(_) => return None
+                    Err(_) => return None,
                 };
                 get_object!(ctx_locked, &guid, Tracing).ok()
             }),
@@ -140,7 +158,7 @@ impl BrowserContext {
                 let ctx = upgrade(&channel.ctx).ok()?;
                 let ctx_locked = match ctx.try_lock() {
                     Ok(l) => l,
-                    Err(_) => return None
+                    Err(_) => return None,
                 };
                 get_object!(ctx_locked, &guid, APIRequestContext).ok()
             }),
@@ -149,7 +167,7 @@ impl BrowserContext {
         let ctx = Self {
             channel,
             var,
-            tx: Mutex::default()
+            tx: Mutex::default(),
         };
         log::trace!(
             "BrowserContext::try_new completed guid={}",
@@ -167,18 +185,18 @@ impl BrowserContext {
 
     pub(crate) async fn new_cdp_session_with_page(
         &self,
-        page: Weak<Page>
+        page: Weak<Page>,
     ) -> ArcResult<Weak<CDPSession>> {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args {
-            page: OnlyGuid
+            page: OnlyGuid,
         }
         let page = upgrade(&page)?;
         let args = Args {
             page: OnlyGuid {
-                guid: page.guid().to_owned()
-            }
+                guid: page.guid().to_owned(),
+            },
         };
         let res = send_message!(self, "newCDPSession", args);
         let session = res.get("session").ok_or(Error::InvalidParams)?;
@@ -189,18 +207,18 @@ impl BrowserContext {
 
     pub(crate) async fn new_cdp_session_with_frame(
         &self,
-        frame: Weak<Frame>
+        frame: Weak<Frame>,
     ) -> ArcResult<Weak<CDPSession>> {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args {
-            frame: OnlyGuid
+            frame: OnlyGuid,
         }
         let frame = upgrade(&frame)?;
         let args = Args {
             frame: OnlyGuid {
-                guid: frame.guid().to_owned()
-            }
+                guid: frame.guid().to_owned(),
+            },
         };
         let res = send_message!(self, "newCDPSession", args);
         let session = res.get("session").ok_or(Error::InvalidParams)?;
@@ -234,7 +252,7 @@ impl BrowserContext {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            urls: &'a [String]
+            urls: &'a [String],
         }
         let args = Args { urls };
         let v = send_message!(self, "cookies", args);
@@ -247,7 +265,7 @@ impl BrowserContext {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            cookies: &'a [Cookie]
+            cookies: &'a [Cookie],
         }
         let args = Args { cookies };
         let _ = send_message!(self, "addCookies", args);
@@ -257,18 +275,18 @@ impl BrowserContext {
     pub(crate) async fn grant_permissions(
         &self,
         permissions: &[String],
-        origin: Option<&str>
+        origin: Option<&str>,
     ) -> ArcResult<()> {
         #[skip_serializing_none]
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a, 'b> {
             permissions: &'a [String],
-            origin: Option<&'b str>
+            origin: Option<&'b str>,
         }
         let args = Args {
             permissions,
-            origin
+            origin,
         };
         let _ = send_message!(self, "grantPermissions", args);
         Ok(())
@@ -279,17 +297,13 @@ impl BrowserContext {
         Ok(())
     }
 
-    pub(crate) async fn route(
-        &self,
-        glob: &str,
-        handler: RouteHandler
-    ) -> ArcResult<()> {
+    pub(crate) async fn route(&self, glob: &str, handler: RouteHandler) -> ArcResult<()> {
         {
             let mut var = self.var.lock().unwrap();
             var.routes.push(RouteEntry {
                 pattern: RoutePattern::Glob(glob.to_owned()),
                 handler,
-                times: None
+                times: None,
             });
         }
         let patterns = self.route_patterns();
@@ -300,14 +314,14 @@ impl BrowserContext {
         &self,
         regex_source: &str,
         regex_flags: &str,
-        handler: RouteHandler
+        handler: RouteHandler,
     ) -> ArcResult<()> {
         {
             let mut var = self.var.lock().unwrap();
             var.routes.push(RouteEntry {
                 pattern: RoutePattern::Regex(regex_source.to_owned(), regex_flags.to_owned()),
                 handler,
-                times: None
+                times: None,
             });
         }
         let patterns = self.route_patterns();
@@ -318,14 +332,14 @@ impl BrowserContext {
         &self,
         glob: &str,
         times: u32,
-        handler: RouteHandler
+        handler: RouteHandler,
     ) -> ArcResult<()> {
         {
             let mut var = self.var.lock().unwrap();
             var.routes.push(RouteEntry {
                 pattern: RoutePattern::Glob(glob.to_owned()),
                 handler,
-                times: Some(times)
+                times: Some(times),
             });
         }
         let patterns = self.route_patterns();
@@ -338,7 +352,7 @@ impl BrowserContext {
             if let Some(g) = glob {
                 var.routes.retain(|r| match &r.pattern {
                     RoutePattern::Glob(s) => s != g,
-                    RoutePattern::Regex(src, _) => src != g
+                    RoutePattern::Regex(src, _) => src != g,
                 });
             } else {
                 var.routes.clear();
@@ -351,13 +365,13 @@ impl BrowserContext {
     pub(crate) async fn route_web_socket(
         &self,
         glob: &str,
-        handler: WebSocketRouteHandler
+        handler: WebSocketRouteHandler,
     ) -> ArcResult<()> {
         {
             let mut var = self.var.lock().unwrap();
             var.websocket_routes.push(WebSocketRouteEntry {
                 pattern: WebSocketRoutePattern::Glob(glob.to_owned()),
-                handler
+                handler,
             });
         }
         let patterns = self.websocket_route_patterns();
@@ -368,16 +382,16 @@ impl BrowserContext {
         &self,
         regex_source: &str,
         regex_flags: &str,
-        handler: WebSocketRouteHandler
+        handler: WebSocketRouteHandler,
     ) -> ArcResult<()> {
         {
             let mut var = self.var.lock().unwrap();
             var.websocket_routes.push(WebSocketRouteEntry {
                 pattern: WebSocketRoutePattern::Regex(
                     regex_source.to_owned(),
-                    regex_flags.to_owned()
+                    regex_flags.to_owned(),
                 ),
-                handler
+                handler,
             });
         }
         let patterns = self.websocket_route_patterns();
@@ -390,7 +404,7 @@ impl BrowserContext {
             if let Some(g) = glob {
                 var.websocket_routes.retain(|r| match &r.pattern {
                     WebSocketRoutePattern::Glob(s) => s != g,
-                    WebSocketRoutePattern::Regex(src, _) => src != g
+                    WebSocketRoutePattern::Regex(src, _) => src != g,
                 });
             } else {
                 var.websocket_routes.clear();
@@ -405,7 +419,7 @@ impl BrowserContext {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            geolocation: Option<&'a Geolocation>
+            geolocation: Option<&'a Geolocation>,
         }
         let args = Args { geolocation };
         let _ = send_message!(self, "setGeolocation", args);
@@ -428,15 +442,15 @@ impl BrowserContext {
 
     pub(crate) async fn set_extra_http_headers<T>(&self, headers: T) -> ArcResult<()>
     where
-        T: IntoIterator<Item = (String, String)>
+        T: IntoIterator<Item = (String, String)>,
     {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args {
-            headers: Vec<Header>
+            headers: Vec<Header>,
         }
         let args = Args {
-            headers: headers.into_iter().map(Header::from).collect()
+            headers: headers.into_iter().map(Header::from).collect(),
         };
         let _ = send_message!(self, "setExtraHTTPHeaders", args);
         Ok(())
@@ -471,9 +485,13 @@ impl BrowserContext {
         self.var.lock().unwrap().browser = Some(browser);
     }
 
-    pub(crate) fn pages(&self) -> Vec<Weak<Page>> { self.var.lock().unwrap().pages.clone() }
+    pub(crate) fn pages(&self) -> Vec<Weak<Page>> {
+        self.var.lock().unwrap().pages.clone()
+    }
 
-    pub(super) fn push_page(&self, p: Weak<Page>) { self.var.lock().unwrap().pages.push(p); }
+    pub(super) fn push_page(&self, p: Weak<Page>) {
+        self.var.lock().unwrap().pages.push(p);
+    }
 
     pub(super) fn remove_page(&self, page: &Weak<Page>) {
         let pages = &mut self.var.lock().unwrap().pages;
@@ -513,14 +531,20 @@ impl BrowserContext {
     }
 
     fn route_patterns(&self) -> Vec<RoutePattern> {
-        let mut patterns: Vec<RoutePattern> =
-            self.var.lock().unwrap().routes.iter().map(|r| r.pattern.clone()).collect();
+        let mut patterns: Vec<RoutePattern> = self
+            .var
+            .lock()
+            .unwrap()
+            .routes
+            .iter()
+            .map(|r| r.pattern.clone())
+            .collect();
         // dedup by serialized key
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         patterns.retain(|p| {
             let k = match p {
                 RoutePattern::Glob(g) => format!("g:{}", g),
-                RoutePattern::Regex(s, f) => format!("r:{}/{}", s, f)
+                RoutePattern::Regex(s, f) => format!("r:{}/{}", s, f),
             };
             seen.insert(k)
         });
@@ -536,12 +560,12 @@ impl BrowserContext {
             #[serde(skip_serializing_if = "Option::is_none")]
             regex_source: Option<&'a str>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            regex_flags: Option<&'a str>
+            regex_flags: Option<&'a str>,
         }
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            patterns: Vec<Pattern<'a>>
+            patterns: Vec<Pattern<'a>>,
         }
         let args = Args {
             patterns: patterns
@@ -550,15 +574,15 @@ impl BrowserContext {
                     RoutePattern::Glob(g) => Pattern {
                         glob: Some(g.as_str()),
                         regex_source: None,
-                        regex_flags: None
+                        regex_flags: None,
                     },
                     RoutePattern::Regex(s, f) => Pattern {
                         glob: None,
                         regex_source: Some(s.as_str()),
-                        regex_flags: Some(f.as_str())
-                    }
+                        regex_flags: Some(f.as_str()),
+                    },
                 })
-                .collect()
+                .collect(),
         };
         let _ = send_message!(self, "setNetworkInterceptionPatterns", args);
         Ok(())
@@ -577,7 +601,7 @@ impl BrowserContext {
         patterns.retain(|p| {
             let k = match p {
                 WebSocketRoutePattern::Glob(g) => format!("g:{}", g),
-                WebSocketRoutePattern::Regex(s, f) => format!("r:{}/{}", s, f)
+                WebSocketRoutePattern::Regex(s, f) => format!("r:{}/{}", s, f),
             };
             seen.insert(k)
         });
@@ -586,7 +610,7 @@ impl BrowserContext {
 
     async fn set_web_socket_interception_patterns(
         &self,
-        patterns: &[WebSocketRoutePattern]
+        patterns: &[WebSocketRoutePattern],
     ) -> ArcResult<()> {
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
@@ -596,12 +620,12 @@ impl BrowserContext {
             #[serde(skip_serializing_if = "Option::is_none")]
             regex_source: Option<&'a str>,
             #[serde(skip_serializing_if = "Option::is_none")]
-            regex_flags: Option<&'a str>
+            regex_flags: Option<&'a str>,
         }
         #[derive(Serialize)]
         #[serde(rename_all = "camelCase")]
         struct Args<'a> {
-            patterns: Vec<Pattern<'a>>
+            patterns: Vec<Pattern<'a>>,
         }
         let args = Args {
             patterns: patterns
@@ -610,15 +634,15 @@ impl BrowserContext {
                     WebSocketRoutePattern::Glob(g) => Pattern {
                         glob: Some(g.as_str()),
                         regex_source: None,
-                        regex_flags: None
+                        regex_flags: None,
                     },
                     WebSocketRoutePattern::Regex(s, f) => Pattern {
                         glob: None,
                         regex_source: Some(s.as_str()),
-                        regex_flags: Some(f.as_str())
-                    }
+                        regex_flags: Some(f.as_str()),
+                    },
                 })
-                .collect()
+                .collect(),
         };
         let _ = send_message!(self, "setWebSocketInterceptionPatterns", args);
         Ok(())
@@ -636,11 +660,13 @@ impl BrowserContext {
                         '*' => regex.push_str(".*"),
                         '.' => regex.push_str("\\."),
                         '?' => regex.push('.'),
-                        c => regex.push(c)
+                        c => regex.push(c),
                     }
                 }
                 regex.push('$');
-                Regex::new(&regex).map(|re| re.is_match(url)).unwrap_or(false)
+                Regex::new(&regex)
+                    .map(|re| re.is_match(url))
+                    .unwrap_or(false)
             }
             WebSocketRoutePattern::Regex(source, flags) => {
                 let mut builder = regex::RegexBuilder::new(source);
@@ -655,7 +681,7 @@ impl BrowserContext {
     fn on_close(&self, ctx: &Context) -> Result<(), Error> {
         let browser = match self.browser().and_then(|b| b.upgrade()) {
             None => return Ok(()),
-            Some(b) => b
+            Some(b) => b,
         };
         let this = get_object!(ctx, self.guid(), BrowserContext)?;
         browser.remove_context(&this);
@@ -664,8 +690,7 @@ impl BrowserContext {
     }
 
     fn on_route(&self, ctx: &Context, params: Map<String, Value>) -> Result<(), Error> {
-        let first = first_object(&params).ok_or(Error::InvalidParams)?;
-        let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+        let OnlyGuid { guid } = guid_from_keys(&params, &["route"])?;
         let route = get_object!(ctx, &guid, Route)?;
         let mut handled = false;
         {
@@ -732,8 +757,7 @@ impl BrowserContext {
     }
 
     fn on_web_socket_route(&self, ctx: &Context, params: Map<String, Value>) -> Result<(), Error> {
-        let first = first_object(&params).ok_or(Error::InvalidParams)?;
-        let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+        let OnlyGuid { guid } = guid_from_keys(&params, &["route"])?;
         let route = get_object!(ctx, &guid, WebSocketRoute)?;
         self.handle_web_socket_route(route);
         Ok(())
@@ -744,8 +768,10 @@ impl BrowserContext {
         let url = route.upgrade().map(|r| r.url().to_owned());
         if let Some(url) = url {
             let var = self.var.lock().unwrap();
-            if let Some(entry) =
-                var.websocket_routes.iter().rfind(|entry| Self::ws_matches(&entry.pattern, &url))
+            if let Some(entry) = var
+                .websocket_routes
+                .iter()
+                .rfind(|entry| Self::ws_matches(&entry.pattern, &url))
             {
                 handled = true;
                 let cb = entry.handler.clone();
@@ -767,16 +793,14 @@ impl BrowserContext {
     }
 
     fn on_console(&self, ctx: &Context, params: Map<String, Value>) -> Result<(), Error> {
-        let first = first_object(&params).ok_or(Error::InvalidParams)?;
-        let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+        let OnlyGuid { guid } = guid_from_keys(&params, &["message", "console", "consoleMessage"])?;
         let console = get_object!(ctx, &guid, ConsoleMessage)?;
         self.emit_event(Evt::Console(console));
         Ok(())
     }
 
     fn on_request(&self, ctx: &Context, params: Map<String, Value>) -> Result<(), Error> {
-        let first = first_object(&params).ok_or(Error::InvalidParams)?;
-        let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+        let OnlyGuid { guid } = guid_from_keys(&params, &["request"])?;
         let request = get_object!(ctx, &guid, Request)?;
         self.emit_event(Evt::Request(request));
         Ok(())
@@ -788,12 +812,12 @@ impl BrowserContext {
         struct De {
             request: OnlyGuid,
             response_end_timing: f64,
-            failure_text: Option<String>
+            failure_text: Option<String>,
         }
         let De {
             request: OnlyGuid { guid },
             response_end_timing,
-            failure_text
+            failure_text,
         } = serde_json::from_value(params.into())?;
         let request = get_object!(ctx, &guid, Request)?;
         let req = upgrade(&request)?;
@@ -808,11 +832,11 @@ impl BrowserContext {
         #[serde(rename_all = "camelCase")]
         struct De {
             request: OnlyGuid,
-            response_end_timing: f64
+            response_end_timing: f64,
         }
         let De {
             request: OnlyGuid { guid },
-            response_end_timing
+            response_end_timing,
         } = serde_json::from_value(params.into())?;
         let request = get_object!(ctx, &guid, Request)?;
         let req = upgrade(&request)?;
@@ -822,8 +846,7 @@ impl BrowserContext {
     }
 
     fn on_response(&self, ctx: &Context, params: Map<String, Value>) -> Result<(), Error> {
-        let first = first_object(&params).ok_or(Error::InvalidParams)?;
-        let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+        let OnlyGuid { guid } = guid_from_keys(&params, &["response"])?;
         let response = get_object!(ctx, &guid, Response)?;
         self.emit_event(Evt::Response(response));
         Ok(())
@@ -831,19 +854,22 @@ impl BrowserContext {
 }
 
 impl RemoteObject for BrowserContext {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 
     fn handle_event(
         &self,
         ctx: &Context,
         method: Str<Method>,
-        params: Map<String, Value>
+        params: Map<String, Value>,
     ) -> Result<(), Error> {
         match method.as_str() {
             "page" => {
-                let first = first_object(&params).ok_or(Error::InvalidParams)?;
-                let OnlyGuid { guid } = serde_json::from_value((*first).clone())?;
+                let OnlyGuid { guid } = guid_from_keys(&params, &["page"])?;
                 let p = get_object!(ctx, &guid, Page)?;
                 self.push_page(p.clone());
                 self.emit_event(Evt::Page(p));
@@ -887,15 +913,19 @@ pub(crate) enum Evt {
     RequestFailed(Weak<Request>),
     RequestFinished(Weak<Request>),
     Response(Weak<Response>),
-    WebError(WebError)
+    WebError(WebError),
 }
 
 impl EventEmitter for BrowserContext {
     type Event = Evt;
 
-    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> { self.tx.lock().unwrap().clone() }
+    fn tx(&self) -> Option<broadcast::Sender<Self::Event>> {
+        self.tx.lock().unwrap().clone()
+    }
 
-    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) { *self.tx.lock().unwrap() = Some(tx); }
+    fn set_tx(&self, tx: broadcast::Sender<Self::Event>) {
+        *self.tx.lock().unwrap() = Some(tx);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -908,7 +938,7 @@ pub enum EventType {
     RequestFailed,
     RequestFinished,
     Response,
-    WebError
+    WebError,
 }
 
 impl IsEvent for Evt {
@@ -924,7 +954,7 @@ impl IsEvent for Evt {
             Self::RequestFailed(_) => EventType::RequestFailed,
             Self::RequestFinished(_) => EventType::RequestFinished,
             Self::Response(_) => EventType::Response,
-            Self::WebError(_) => EventType::WebError
+            Self::WebError(_) => EventType::WebError,
         }
     }
 }
@@ -935,7 +965,7 @@ struct Initializer {
     #[serde(default)]
     tracing: Option<OnlyGuid>,
     #[serde(default)]
-    request_context: Option<OnlyGuid>
+    request_context: Option<OnlyGuid>,
 }
 
 impl fmt::Debug for BrowserContext {

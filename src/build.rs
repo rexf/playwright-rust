@@ -1,7 +1,7 @@
 use std::{
     env, fmt, fs,
     fs::File,
-    path::{Path, PathBuf, MAIN_SEPARATOR}
+    path::{Path, PathBuf, MAIN_SEPARATOR},
 };
 
 // Match the Playwright release tag (e.g. 1.57.0). This is the version of the
@@ -75,7 +75,9 @@ fn check_size(p: &Path) {
 
 // No network access
 #[cfg(feature = "only-for-docs-rs")]
-fn download(_url: &str, dest: &Path) { File::create(dest).unwrap(); }
+fn download(_url: &str, dest: &Path) {
+    File::create(dest).unwrap();
+}
 
 fn url(platform: PlaywrightPlatform) -> String {
     // Nightly builds live under /next; stable tags do not.
@@ -96,7 +98,7 @@ enum PlaywrightPlatform {
     Win32,
     Win32x64,
     MacX64,
-    MacArm64
+    MacArm64,
 }
 
 impl fmt::Display for PlaywrightPlatform {
@@ -107,7 +109,7 @@ impl fmt::Display for PlaywrightPlatform {
             Self::Win32 => write!(f, "win32"),
             Self::Win32x64 => write!(f, "win32_x64"),
             Self::MacX64 => write!(f, "mac"),
-            Self::MacArm64 => write!(f, "mac-arm64")
+            Self::MacArm64 => write!(f, "mac-arm64"),
         }
     }
 }

@@ -5,14 +5,14 @@ use crate::{
         element_handle::{
             CheckArgs, ClickArgs, ElementHandle as Impl, FillArgs, HoverArgs, Opt, PressArgs,
             ScreenshotArgs, SelectOptionArgs, SetInputFilesArgs, TapArgs, TypeArgs,
-            WaitForSelectorArgs
+            WaitForSelectorArgs,
         },
         prelude::*,
         utils::{
             ElementState, File, FloatRect, KeyboardModifier, MouseButton, Position, ScreenshotType,
-            WaitForSelectorState
-        }
-    }
+            WaitForSelectorState,
+        },
+    },
 };
 
 /// ElementHandle represents an in-page DOM element. ElementHandles can be created with the [`method: Page.querySelector`]
@@ -38,7 +38,7 @@ use crate::{
 /// methods.
 #[derive(Debug)]
 pub struct ElementHandle {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for ElementHandle {
@@ -53,12 +53,16 @@ impl PartialEq for ElementHandle {
 
 macro_rules! is_checked {
     ($f: ident) => {
-        pub async fn $f(&self) -> ArcResult<bool> { upgrade(&self.inner)?.$f().await }
+        pub async fn $f(&self) -> ArcResult<bool> {
+            upgrade(&self.inner)?.$f().await
+        }
     };
 }
 
 impl ElementHandle {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     pub(crate) fn guid(&self) -> Result<Str<Guid>, Error> {
         Ok(upgrade(&self.inner)?.guid().to_owned())
@@ -81,10 +85,14 @@ impl ElementHandle {
     }
 
     /// Returns the `element.innerText`.
-    pub async fn inner_text(&self) -> ArcResult<String> { upgrade(&self.inner)?.inner_text().await }
+    pub async fn inner_text(&self) -> ArcResult<String> {
+        upgrade(&self.inner)?.inner_text().await
+    }
 
     /// Returns the `element.innerHTML`.
-    pub async fn inner_html(&self) -> ArcResult<String> { upgrade(&self.inner)?.inner_html().await }
+    pub async fn inner_html(&self) -> ArcResult<String> {
+        upgrade(&self.inner)?.inner_html().await
+    }
 
     is_checked! {is_checked}
     is_checked! {is_disabled}
@@ -123,9 +131,13 @@ impl ElementHandle {
     ///
     /// When all steps combined have not finished during the specified `timeout`, this method throws a `TimeoutError`. Passing
     /// zero timeout disables this.
-    pub fn hover_builder(&self) -> HoverBuilder { HoverBuilder::new(self.inner.clone()) }
+    pub fn hover_builder(&self) -> HoverBuilder {
+        HoverBuilder::new(self.inner.clone())
+    }
 
-    pub fn click_builder(&self) -> ClickBuilder { ClickBuilder::new(self.inner.clone()) }
+    pub fn click_builder(&self) -> ClickBuilder {
+        ClickBuilder::new(self.inner.clone())
+    }
 
     /// This method double clicks an element matching `selector` by performing the following steps:
     /// 1. Find an element matching `selector`. If there is none, wait until a matching element is attached to the DOM.
@@ -140,7 +152,9 @@ impl ElementHandle {
     /// zero timeout disables this.
     ///
     /// > NOTE: `frame.dblclick()` dispatches two `click` events and a single `dblclick` event.
-    pub fn dblclick_builder(&self) -> DblClickBuilder { DblClickBuilder::new(self.inner.clone()) }
+    pub fn dblclick_builder(&self) -> DblClickBuilder {
+        DblClickBuilder::new(self.inner.clone())
+    }
 
     /// This method checks the element by performing the following steps:
     /// 1. Ensure that element is a checkbox or a radio input. If not, this method throws. If the element is already checked,
@@ -155,7 +169,9 @@ impl ElementHandle {
     ///
     /// When all steps combined have not finished during the specified `timeout`, this method throws a `TimeoutError`. Passing
     /// zero timeout disables this.
-    pub fn check_builder(&self) -> CheckBuilder { CheckBuilder::new(self.inner.clone()) }
+    pub fn check_builder(&self) -> CheckBuilder {
+        CheckBuilder::new(self.inner.clone())
+    }
 
     /// This method checks the element by performing the following steps:
     /// 1. Ensure that element is a checkbox or a radio input. If not, this method throws. If the element is already
@@ -170,7 +186,9 @@ impl ElementHandle {
     ///
     /// When all steps combined have not finished during the specified `timeout`, this method throws a `TimeoutError`. Passing
     /// zero timeout disables this.
-    pub fn uncheck_builder(&self) -> UncheckBuilder { UncheckBuilder::new(self.inner.clone()) }
+    pub fn uncheck_builder(&self) -> UncheckBuilder {
+        UncheckBuilder::new(self.inner.clone())
+    }
 
     /// This method taps the element by performing the following steps:
     /// 1. Wait for [actionability](https://playwright.dev/docs/actionability/) checks on the element, unless `force` option is set.
@@ -184,7 +202,9 @@ impl ElementHandle {
     /// zero timeout disables this.
     ///
     /// > NOTE: `elementHandle.tap()` requires that the `hasTouch` option of the browser context be set to true.
-    pub fn tap_builder(&self) -> TapBuilder { TapBuilder::new(self.inner.clone()) }
+    pub fn tap_builder(&self) -> TapBuilder {
+        TapBuilder::new(self.inner.clone())
+    }
 
     /// This method waits for [actionability](https://playwright.dev/docs/actionability/) checks, focuses the element, fills it and triggers an `input`
     /// event after filling. Note that you can pass an empty string to clear the input field.
@@ -200,7 +220,9 @@ impl ElementHandle {
     }
 
     /// Calls [focus](https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/focus) on the element.
-    pub async fn focus(&self) -> ArcResult<()> { upgrade(&self.inner)?.focus().await }
+    pub async fn focus(&self) -> ArcResult<()> {
+        upgrade(&self.inner)?.focus().await
+    }
 
     /// Focuses the element, and then sends a `keydown`, `keypress`/`input`, and `keyup` event for each character in the text.
     ///
@@ -295,7 +317,7 @@ impl ElementHandle {
     pub async fn wait_for_element_state(
         &self,
         state: ElementState,
-        timeout: Option<f64>
+        timeout: Option<f64>,
     ) -> ArcResult<()> {
         upgrade(&self.inner)?
             .wait_for_element_state(state, timeout)
@@ -358,7 +380,7 @@ impl ElementHandle {
     /// ```
     pub async fn dispatch_event<T>(&self, r#type: &str, event_init: Option<T>) -> ArcResult<()>
     where
-        T: Serialize
+        T: Serialize,
     {
         upgrade(&self.inner)?
             .dispatch_event(r#type, event_init)
@@ -406,7 +428,7 @@ impl ElementHandle {}
 
 pub struct HoverBuilder {
     inner: Weak<Impl>,
-    args: HoverArgs
+    args: HoverArgs,
 }
 
 impl HoverBuilder {
@@ -440,7 +462,7 @@ macro_rules! clicker {
     ($t: ident, $f: ident) => {
         pub struct $t {
             inner: Weak<Impl>,
-            args: ClickArgs
+            args: ClickArgs,
         }
 
         impl $t {
@@ -488,7 +510,7 @@ macro_rules! check_builder {
     ($t: ident, $m: ident) => {
         pub struct $t {
             inner: Weak<Impl>,
-            args: CheckArgs
+            args: CheckArgs,
         }
 
         impl $t {
@@ -526,7 +548,7 @@ check_builder!(UncheckBuilder, uncheck);
 
 pub struct TapBuilder {
     inner: Weak<Impl>,
-    args: TapArgs
+    args: TapArgs,
 }
 
 impl TapBuilder {
@@ -563,7 +585,7 @@ impl TapBuilder {
 
 pub struct FillBuilder<'a> {
     inner: Weak<Impl>,
-    args: FillArgs<'a>
+    args: FillArgs<'a>,
 }
 
 impl<'a> FillBuilder<'a> {
@@ -591,7 +613,7 @@ macro_rules! type_builder {
     ($t: ident, $a: ident, $f: ident, $m: ident) => {
         pub struct $t<'a> {
             inner: Weak<Impl>,
-            args: $a<'a>
+            args: $a<'a>,
         }
 
         impl<'a> $t<'a> {
@@ -624,7 +646,7 @@ type_builder!(PressBuilder, PressArgs, key, press);
 
 pub struct ScreenshotBuilder<'a> {
     inner: Weak<Impl>,
-    args: ScreenshotArgs<'a>
+    args: ScreenshotArgs<'a>,
 }
 
 impl<'a> ScreenshotBuilder<'a> {
@@ -664,7 +686,7 @@ impl<'a> ScreenshotBuilder<'a> {
 
 pub struct WaitForSelectorBuilder<'a> {
     inner: Weak<Impl>,
-    args: WaitForSelectorArgs<'a>
+    args: WaitForSelectorArgs<'a>,
 }
 
 impl<'a> WaitForSelectorBuilder<'a> {
@@ -688,7 +710,7 @@ impl<'a> WaitForSelectorBuilder<'a> {
 pub struct SelectOptionBuilder {
     inner: Weak<Impl>,
     args: SelectOptionArgs,
-    err: Option<Error>
+    err: Option<Error>,
 }
 
 impl SelectOptionBuilder {
@@ -697,7 +719,7 @@ impl SelectOptionBuilder {
         Self {
             inner,
             args,
-            err: None
+            err: None,
         }
     }
 
@@ -779,7 +801,7 @@ impl SelectOptionBuilder {
 
 pub struct SetInputFilesBuilder {
     inner: Weak<Impl>,
-    args: SetInputFilesArgs
+    args: SetInputFilesArgs,
 }
 
 impl SetInputFilesBuilder {
@@ -822,7 +844,7 @@ mod ser {
     impl Serialize for ElementHandle {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: ser::Serializer
+            S: ser::Serializer,
         {
             let mut s = serializer.serialize_struct("fff9ae7f-9070-480f-9a8a-3d4b66923f7d", 1)?;
             let guid = &self.guid().map_err(<S::Error as ser::Error>::custom)?;

@@ -8,7 +8,7 @@ use std::fmt;
 /// const windowHandle = await page.evaluateHandle(() => window);
 ///// ...
 /// ```
-/// 
+///
 /// JsHandle prevents the referenced JavaScript object being garbage collected unless the handle is exposed with
 /// [`method: JsHandle.dispose`]. JsHandles are auto-disposed when their origin frame gets navigated or the parent context
 /// gets destroyed.
@@ -16,7 +16,7 @@ use std::fmt;
 /// JsHandle instances can be used as an argument in [`method: Page.evalOnSelector`], [`method: Page.evaluate`] and
 /// [`method: Page.evaluateHandle`] methods.
 pub struct JsHandle {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for JsHandle {
@@ -30,7 +30,9 @@ impl PartialEq for JsHandle {
 }
 
 impl JsHandle {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     pub(crate) fn guid(&self) -> Result<Str<Guid>, Error> {
         Ok(upgrade(&self.inner)?.guid().to_owned())
@@ -58,7 +60,9 @@ impl JsHandle {
         Ok(m.into_iter().map(|(k, v)| (k, JsHandle::new(v))).collect())
     }
 
-    pub async fn dispose(&mut self) -> ArcResult<()> { upgrade(&self.inner)?.dispose().await }
+    pub async fn dispose(&mut self) -> ArcResult<()> {
+        upgrade(&self.inner)?.dispose().await
+    }
 
     /// Returns a JSON representation of the object. If the object has a `toJSON` function, it **will not be called**.
     ///
@@ -66,7 +70,7 @@ impl JsHandle {
     /// error if the object has circular references.
     pub async fn json_value<U>(&mut self) -> ArcResult<U>
     where
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         upgrade(&self.inner)?.json_value().await
     }
@@ -91,7 +95,7 @@ mod ser {
     impl Serialize for JsHandle {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
-            S: ser::Serializer
+            S: ser::Serializer,
         {
             let mut s = serializer.serialize_struct("4a9c3811-6f00-49e5-8a81-939f932d9061", 1)?;
             let guid = &self.guid().map_err(<S::Error as ser::Error>::custom)?;

@@ -23,7 +23,7 @@ async fn register_should_work(playwright: &Playwright, selectors: &Selectors, wh
     let t = match which {
         Which::Webkit => playwright.webkit(),
         Which::Firefox => playwright.firefox(),
-        Which::Chromium => playwright.chromium()
+        Which::Chromium => playwright.chromium(),
     };
     let browser = t.launcher().launch().await.unwrap();
     let bc = browser.context_builder().build().await.unwrap();

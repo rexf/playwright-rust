@@ -8,6 +8,7 @@ mod imp;
 
 pub use crate::imp::core::{Driver, Error};
 pub use api::playwright::Playwright;
+pub use api::GetByRoleOptions;
 
 #[doc(hidden)]
 #[macro_export]

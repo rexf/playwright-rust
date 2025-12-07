@@ -4,12 +4,12 @@ use std::fmt;
 #[derive(Debug)]
 pub(crate) struct JsHandle {
     channel: ChannelOwner,
-    var: Mutex<Var>
+    var: Mutex<Var>,
 }
 
 #[derive(Debug)]
 struct Var {
-    preview: String
+    preview: String,
 }
 
 impl JsHandle {
@@ -38,10 +38,10 @@ impl JsHandle {
             .map(
                 |Property {
                      name,
-                     value: OnlyGuid { guid }
+                     value: OnlyGuid { guid },
                  }| {
                     get_object!(self.context()?.lock().unwrap(), &guid, JsHandle).map(|o| (name, o))
-                }
+                },
             )
             .collect::<Result<HashMap<_, _>, Error>>()?;
         Ok(ps)
@@ -54,7 +54,7 @@ impl JsHandle {
 
     pub(crate) async fn json_value<U>(&self) -> ArcResult<U>
     where
-        U: DeserializeOwned
+        U: DeserializeOwned,
     {
         let v = send_message!(self, "jsonValue", Map::new());
         let first = first(&v).ok_or(Error::ObjectNotFound)?;
@@ -71,7 +71,7 @@ impl JsHandle {
     fn on_preview_updated(&self, params: Map<String, Value>) -> Result<(), Error> {
         #[derive(Deserialize)]
         struct De {
-            preview: String
+            preview: String,
         }
         let De { preview } = serde_json::from_value(params.into())?;
         self.set_preview(preview);
@@ -80,14 +80,18 @@ impl JsHandle {
 }
 
 impl RemoteObject for JsHandle {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 
     fn handle_event(
         &self,
         _ctx: &Context,
         method: Str<Method>,
-        params: Map<String, Value>
+        params: Map<String, Value>,
     ) -> Result<(), Error> {
         if method.as_str() == "previewUpdated" {
             self.on_preview_updated(params)?;
@@ -105,11 +109,11 @@ impl fmt::Display for JsHandle {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Initializer {
-    preview: String
+    preview: String,
 }
 
 #[derive(Deserialize)]
 struct Property {
     name: String,
-    value: OnlyGuid
+    value: OnlyGuid,
 }

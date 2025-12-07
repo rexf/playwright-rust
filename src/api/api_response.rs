@@ -1,12 +1,7 @@
 use crate::{
     api::api_request_context::APIRequestContext,
-    imp::{
-        api_request_context::APIResponsePayload,
-        core::*,
-        utils::Header,
-        prelude::*
-    },
-    Error
+    imp::{api_request_context::APIResponsePayload, core::*, prelude::*, utils::Header},
+    Error,
 };
 use serde::de::DeserializeOwned;
 
@@ -14,7 +9,7 @@ use serde::de::DeserializeOwned;
 #[derive(Clone)]
 pub struct APIResponse {
     ctx: APIRequestContext,
-    payload: APIResponsePayload
+    payload: APIResponsePayload,
 }
 
 impl APIResponse {
@@ -22,9 +17,15 @@ impl APIResponse {
         Self { ctx, payload }
     }
 
-    pub fn status(&self) -> i32 { self.payload.status }
-    pub fn status_text(&self) -> &str { &self.payload.status_text }
-    pub fn url(&self) -> &str { &self.payload.url }
+    pub fn status(&self) -> i32 {
+        self.payload.status
+    }
+    pub fn status_text(&self) -> &str {
+        &self.payload.status_text
+    }
+    pub fn url(&self) -> &str {
+        &self.payload.url
+    }
 
     pub fn headers(&self) -> Vec<(String, String)> {
         self.payload
@@ -35,7 +36,9 @@ impl APIResponse {
             .collect()
     }
 
-    pub fn headers_array(&self) -> Vec<Header> { self.payload.headers.clone() }
+    pub fn headers_array(&self) -> Vec<Header> {
+        self.payload.headers.clone()
+    }
 
     pub fn ok(&self) -> bool {
         let s = self.payload.status;
@@ -55,7 +58,7 @@ impl APIResponse {
 
     pub async fn json<T>(&self) -> Result<T, Arc<Error>>
     where
-        T: DeserializeOwned
+        T: DeserializeOwned,
     {
         let bytes = self.body().await?;
         serde_json::from_slice(&bytes).map_err(|e| Arc::new(Error::Serde(e)))

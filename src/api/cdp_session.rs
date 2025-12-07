@@ -1,12 +1,12 @@
 use crate::imp::{
     cdp_session::{CDPSession as Impl, Evt},
     core::*,
-    prelude::*
+    prelude::*,
 };
 
 #[derive(Clone)]
 pub struct CDPSession {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for CDPSession {
@@ -20,19 +20,23 @@ impl PartialEq for CDPSession {
 }
 
 impl CDPSession {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     /// Sends a raw Chrome DevTools Protocol command.
     pub async fn send(
         &self,
         method: &str,
-        params: Option<serde_json::Value>
+        params: Option<serde_json::Value>,
     ) -> Result<Option<serde_json::Value>, Arc<Error>> {
         upgrade(&self.inner)?.send(method, params).await
     }
 
     /// Detaches the session from its target.
-    pub async fn detach(&self) -> ArcResult<()> { upgrade(&self.inner)?.detach().await }
+    pub async fn detach(&self) -> ArcResult<()> {
+        upgrade(&self.inner)?.detach().await
+    }
 
     subscribe_event! {}
 }
@@ -40,9 +44,11 @@ impl CDPSession {
 #[derive(Debug, Clone)]
 pub struct Event {
     pub method: String,
-    pub params: Option<serde_json::Value>
+    pub params: Option<serde_json::Value>,
 }
 
 impl From<Evt> for Event {
-    fn from(Evt { method, params }: Evt) -> Self { Self { method, params } }
+    fn from(Evt { method, params }: Evt) -> Self {
+        Self { method, params }
+    }
 }

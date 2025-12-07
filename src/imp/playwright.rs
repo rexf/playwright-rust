@@ -7,8 +7,8 @@ use crate::{
         impl_future::*,
         prelude::*,
         selectors::Selectors,
-        utils::Viewport
-    }
+        utils::Viewport,
+    },
 };
 use serde::Deserialize;
 use std::{sync::TryLockError, time::Instant};
@@ -20,7 +20,7 @@ pub(crate) struct Playwright {
     firefox: Weak<BrowserType>,
     webkit: Weak<BrowserType>,
     selectors: Option<Weak<Selectors>>,
-    devices: Vec<DeviceDescriptor>
+    devices: Vec<DeviceDescriptor>,
 }
 
 impl Playwright {
@@ -31,7 +31,7 @@ impl Playwright {
         let webkit = get_object!(ctx, &i.webkit.guid, BrowserType)?;
         let selectors = match i.selectors {
             Some(OnlyGuid { guid }) => get_object!(ctx, &guid, Selectors).ok(),
-            None => None
+            None => None,
         };
         let devices = i.device_descriptors;
         Ok(Self {
@@ -40,27 +40,37 @@ impl Playwright {
             firefox,
             webkit,
             selectors,
-            devices
+            devices,
         })
     }
 
-    pub(crate) fn devices(&self) -> &[DeviceDescriptor] { &self.devices }
+    pub(crate) fn devices(&self) -> &[DeviceDescriptor] {
+        &self.devices
+    }
 
     pub(crate) fn device(&self, name: &str) -> Option<&DeviceDescriptor> {
         self.devices.iter().find(|d| d.name == name)
     }
 
-    pub(crate) fn chromium(&self) -> Weak<BrowserType> { self.chromium.clone() }
+    pub(crate) fn chromium(&self) -> Weak<BrowserType> {
+        self.chromium.clone()
+    }
 
-    pub(crate) fn firefox(&self) -> Weak<BrowserType> { self.firefox.clone() }
+    pub(crate) fn firefox(&self) -> Weak<BrowserType> {
+        self.firefox.clone()
+    }
 
-    pub(crate) fn webkit(&self) -> Weak<BrowserType> { self.webkit.clone() }
+    pub(crate) fn webkit(&self) -> Weak<BrowserType> {
+        self.webkit.clone()
+    }
 
-    pub(crate) fn selectors(&self) -> Option<Weak<Selectors>> { self.selectors.clone() }
+    pub(crate) fn selectors(&self) -> Option<Weak<Selectors>> {
+        self.selectors.clone()
+    }
 
     pub(crate) async fn new_api_request_context(
         &self,
-        args: NewContextArgs
+        args: NewContextArgs,
     ) -> ArcResult<Weak<APIRequestContext>> {
         let v = send_message!(self, "newRequest", args);
         let request = v.get("request").ok_or(Error::InvalidParams)?;
@@ -75,8 +85,12 @@ impl Playwright {
 }
 
 impl RemoteObject for Playwright {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,19 +107,19 @@ struct Initializer {
     #[serde(default)]
     selectors: Option<OnlyGuid>,
     #[serde(default)]
-    device_descriptors: Vec<DeviceDescriptor>
+    device_descriptors: Vec<DeviceDescriptor>,
 }
 
 pub(crate) struct WaitInitialObject {
     ctx: Wm<Context>,
-    started: Instant
+    started: Instant,
 }
 
 impl WaitInitialObject {
     fn new(ctx: Wm<Context>) -> Self {
         Self {
             ctx,
-            started: Instant::now()
+            started: Instant::now(),
         }
     }
 }
@@ -129,11 +143,11 @@ impl Future for WaitInitialObject {
         let c = match rc.try_lock() {
             Ok(x) => x,
             Err(TryLockError::WouldBlock) => pending!(),
-            Err(e) => Err(e).unwrap()
+            Err(e) => Err(e).unwrap(),
         };
         match get_object!(c, i, Playwright) {
             Ok(p) => Poll::Ready(Ok(p)),
-            Err(_) => pending!()
+            Err(_) => pending!(),
         }
     }
 }
@@ -147,18 +161,18 @@ pub struct DeviceDescriptor {
     pub device_scale_factor: f64,
     pub is_mobile: bool,
     pub has_touch: bool,
-    pub default_browser_type: String
+    pub default_browser_type: String,
 }
 
 impl<'de> Deserialize<'de> for DeviceDescriptor {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         #[derive(Deserialize)]
         struct DeviceDescriptorImpl {
             name: String,
-            descriptor: Descriptor
+            descriptor: Descriptor,
         }
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -169,7 +183,7 @@ impl<'de> Deserialize<'de> for DeviceDescriptor {
             device_scale_factor: f64,
             is_mobile: bool,
             has_touch: bool,
-            default_browser_type: String
+            default_browser_type: String,
         }
         let DeviceDescriptorImpl {
             name,
@@ -181,8 +195,8 @@ impl<'de> Deserialize<'de> for DeviceDescriptor {
                     device_scale_factor,
                     is_mobile,
                     has_touch,
-                    default_browser_type
-                }
+                    default_browser_type,
+                },
         } = DeviceDescriptorImpl::deserialize(deserializer)?;
         Ok(DeviceDescriptor {
             name,
@@ -192,7 +206,7 @@ impl<'de> Deserialize<'de> for DeviceDescriptor {
             device_scale_factor,
             is_mobile,
             has_touch,
-            default_browser_type
+            default_browser_type,
         })
     }
 }
@@ -215,14 +229,14 @@ macro_rules! impl_set_device {
 impl DeviceDescriptor {
     pub(crate) fn set_persistent_context<'source, 'b, 'c, 'd, 'e, 'g, 'h, 'i, 'j, 'k, 'l>(
         device: &'source Self,
-        builder: PersistentContextLauncher<'b, 'c, 'd, 'e, 'source, 'g, 'h, 'i, 'j, 'k, 'l>
+        builder: PersistentContextLauncher<'b, 'c, 'd, 'e, 'source, 'g, 'h, 'i, 'j, 'k, 'l>,
     ) -> PersistentContextLauncher<'b, 'c, 'd, 'e, 'source, 'g, 'h, 'i, 'j, 'k, 'l> {
         impl_set_device!(device, builder)
     }
 
     pub(crate) fn set_context<'source, 'c, 'd, 'e, 'f, 'g, 'h>(
         device: &'source Self,
-        builder: ContextBuilder<'source, 'c, 'd, 'e, 'f, 'g, 'h>
+        builder: ContextBuilder<'source, 'c, 'd, 'e, 'f, 'g, 'h>,
     ) -> ContextBuilder<'source, 'c, 'd, 'e, 'f, 'g, 'h> {
         impl_set_device!(device, builder)
     }

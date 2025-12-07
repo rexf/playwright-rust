@@ -21,7 +21,7 @@ use std::path::PathBuf;
 pub enum Which {
     Webkit,
     Firefox,
-    Chromium
+    Chromium,
 }
 
 playwright::runtime_test!(chromium_page, page(Which::Chromium).await);
@@ -72,7 +72,7 @@ fn install_browser(p: &Playwright, which: Which) {
     match which {
         Which::Webkit => p.install_webkit(),
         Which::Firefox => p.install_firefox(),
-        Which::Chromium => p.install_chromium()
+        Which::Chromium => p.install_chromium(),
     }
     .unwrap();
 }
@@ -89,17 +89,17 @@ async fn playwright_with_driver() -> Playwright {
 async fn start_test_server(port: u16) {
     use warp::{
         http::header::{HeaderMap, HeaderValue},
-        Filter
+        Filter,
     };
     let headers = {
         let mut headers = HeaderMap::new();
         headers.insert(
             "Content-Type",
-            HeaderValue::from_static("application/octet-stream")
+            HeaderValue::from_static("application/octet-stream"),
         );
         headers.insert(
             "Content-Disposition",
-            HeaderValue::from_static("attachment")
+            HeaderValue::from_static("attachment"),
         );
         headers
     };
@@ -148,9 +148,13 @@ fn url_download(port: u16, path: &str) -> String {
     format!("http://localhost:{}/download{}", port, path)
 }
 
-fn origin(port: u16) -> String { format!("http://localhost:{}", port) }
+fn origin(port: u16) -> String {
+    format!("http://localhost:{}", port)
+}
 
-fn temp_dir() -> PathBuf { std::env::temp_dir().join("test-playwright-rust") }
+fn temp_dir() -> PathBuf {
+    std::env::temp_dir().join("test-playwright-rust")
+}
 
 //    let h = page.eval_handle("() => location.href").await.unwrap();
 //    let s: String = page

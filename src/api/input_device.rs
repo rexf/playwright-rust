@@ -2,7 +2,7 @@ use crate::imp::{
     core::*,
     page::{MouseClickArgs, Page as PageImpl},
     prelude::*,
-    utils::MouseButton
+    utils::MouseButton,
 };
 
 /// Keyboard provides an api for managing a virtual keyboard. The high level api is [`method: Keyboard.type`], which takes
@@ -25,14 +25,14 @@ use crate::imp::{
 /// await page.keyboard.press('Backspace');
 ///// Result text will end up saying 'Hello!'
 /// ```
-/// 
+///
 /// An example of pressing uppercase `A`
 /// ```js
 /// await page.keyboard.press('Shift+KeyA');
 ///// or
 /// await page.keyboard.press('Shift+A');
 /// ```
-/// 
+///
 /// An example to trigger select-all with the keyboard
 /// ```js
 ///// on Windows and Linux
@@ -42,7 +42,7 @@ use crate::imp::{
 /// ```
 #[derive(Debug, Clone)]
 pub struct Keyboard {
-    inner: Weak<PageImpl>
+    inner: Weak<PageImpl>,
 }
 
 /// The Mouse class operates in main-frame CSS pixels relative to the top-left corner of the viewport.
@@ -61,18 +61,20 @@ pub struct Keyboard {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Mouse {
-    inner: Weak<PageImpl>
+    inner: Weak<PageImpl>,
 }
 
 /// The Touchscreen class operates in main-frame CSS pixels relative to the top-left corner of the viewport. Methods on the
 /// touchscreen can only be used in browser contexts that have been initialized with `hasTouch` set to true.
 #[derive(Debug, Clone)]
 pub struct TouchScreen {
-    inner: Weak<PageImpl>
+    inner: Weak<PageImpl>,
 }
 
 impl Keyboard {
-    pub(crate) fn new(inner: Weak<PageImpl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<PageImpl>) -> Self {
+        Self { inner }
+    }
 
     /// Dispatches a `keydown` event.
     ///
@@ -145,7 +147,9 @@ impl Keyboard {
 }
 
 impl Mouse {
-    pub(crate) fn new(inner: Weak<PageImpl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<PageImpl>) -> Self {
+        Self { inner }
+    }
 
     pub async fn r#move(&self, x: f64, y: f64, steps: Option<i32>) -> Result<(), Arc<Error>> {
         let inner = upgrade(&self.inner)?;
@@ -155,7 +159,7 @@ impl Mouse {
     pub async fn down(
         &self,
         button: Option<MouseButton>,
-        click_count: Option<i32>
+        click_count: Option<i32>,
     ) -> Result<(), Arc<Error>> {
         let inner = upgrade(&self.inner)?;
         inner.mouse_down(button, click_count).await
@@ -164,7 +168,7 @@ impl Mouse {
     pub async fn up(
         &self,
         button: Option<MouseButton>,
-        click_count: Option<i32>
+        click_count: Option<i32>,
     ) -> Result<(), Arc<Error>> {
         let inner = upgrade(&self.inner)?;
         inner.mouse_up(button, click_count).await
@@ -183,7 +187,9 @@ impl Mouse {
 }
 
 impl TouchScreen {
-    pub(crate) fn new(inner: Weak<PageImpl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<PageImpl>) -> Self {
+        Self { inner }
+    }
 
     pub async fn tap(&self, x: f64, y: f64) -> Result<(), Arc<Error>> {
         let inner = upgrade(&self.inner)?;
@@ -195,7 +201,7 @@ macro_rules! clicker {
     ($t: ident, $f: ident, $mf: ident) => {
         pub struct $t {
             inner: Weak<PageImpl>,
-            args: MouseClickArgs
+            args: MouseClickArgs,
         }
 
         impl $t {

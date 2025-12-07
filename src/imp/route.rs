@@ -3,7 +3,7 @@ use crate::imp::{core::*, prelude::*, request::Request, utils::Header};
 #[derive(Debug)]
 pub(crate) struct Route {
     channel: ChannelOwner,
-    request: Weak<Request>
+    request: Weak<Request>,
 }
 
 impl Route {
@@ -13,7 +13,9 @@ impl Route {
         Ok(Self { channel, request })
     }
 
-    pub(crate) fn request(&self) -> Weak<Request> { self.request.clone() }
+    pub(crate) fn request(&self) -> Weak<Request> {
+        self.request.clone()
+    }
 
     pub(crate) async fn fallback(&self) -> ArcResult<()> {
         let _ = send_message!(self, "fallback", Map::new());
@@ -41,14 +43,18 @@ impl Route {
 }
 
 impl RemoteObject for Route {
-    fn channel(&self) -> &ChannelOwner { &self.channel }
-    fn channel_mut(&mut self) -> &mut ChannelOwner { &mut self.channel }
+    fn channel(&self) -> &ChannelOwner {
+        &self.channel
+    }
+    fn channel_mut(&mut self) -> &mut ChannelOwner {
+        &mut self.channel
+    }
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Initializer {
-    request: OnlyGuid
+    request: OnlyGuid,
 }
 
 #[skip_serializing_none]
@@ -59,7 +65,7 @@ pub(crate) struct FulfillArgs<'a, 'b> {
     is_base64: bool,
     pub(crate) status: Option<i32>,
     pub(crate) headers: Option<Vec<Header>>,
-    pub(crate) content_type: Option<&'b str>
+    pub(crate) content_type: Option<&'b str>,
 }
 
 impl<'a, 'b> FulfillArgs<'a, 'b> {
@@ -69,7 +75,7 @@ impl<'a, 'b> FulfillArgs<'a, 'b> {
             is_base64,
             status: None,
             headers: None,
-            content_type: None
+            content_type: None,
         }
     }
 }
@@ -81,5 +87,5 @@ pub(crate) struct ContinueArgs<'a, 'b, 'c> {
     pub(crate) url: Option<&'a str>,
     pub(crate) method: Option<&'b str>,
     pub(crate) headers: Option<Vec<Header>>,
-    pub(crate) post_data: Option<&'c str>
+    pub(crate) post_data: Option<&'c str>,
 }

@@ -9,10 +9,10 @@ pub trait EventEmitter {
     fn set_tx(&self, tx: broadcast::Sender<Self::Event>);
 
     fn new_tx(
-        &self
+        &self,
     ) -> (
         broadcast::Sender<Self::Event>,
-        broadcast::Receiver<Self::Event>
+        broadcast::Receiver<Self::Event>,
     ) {
         broadcast::channel(64)
     }
@@ -27,7 +27,9 @@ pub trait EventEmitter {
         }
     }
 
-    fn emit_event<E: Into<Self::Event>>(&self, e: E) { self.tx().map(|tx| tx.send(e.into()).ok()); }
+    fn emit_event<E: Into<Self::Event>>(&self, e: E) {
+        self.tx().map(|tx| tx.send(e.into()).ok());
+    }
 }
 
 pub(crate) trait IsEvent: Clone {
@@ -40,11 +42,11 @@ pub(crate) trait IsEvent: Clone {
 pub(crate) async fn expect_event<E>(
     mut rx: broadcast::Receiver<E>,
     evt: E::EventType,
-    timeout: u32
+    timeout: u32,
 ) -> Result<E, Error>
 where
     E: IsEvent + Send + Sync + 'static,
-    <E as event_emitter::IsEvent>::EventType: Send + Sync
+    <E as event_emitter::IsEvent>::EventType: Send + Sync,
 {
     consume(&mut rx).await?;
     let sleep = sleep(Duration::from_millis(timeout as u64));
@@ -53,7 +55,7 @@ where
             match rx.recv().await {
                 Ok(x) if x.event_type() == evt => break Ok(x),
                 Ok(_) => continue,
-                Err(e) => break Err(e)
+                Err(e) => break Err(e),
             }
         }
     });
@@ -67,11 +69,11 @@ where
 pub(crate) async fn expect_event<E>(
     mut rx: broadcast::Receiver<E>,
     evt: E::EventType,
-    timeout: u32
+    timeout: u32,
 ) -> Result<E, Error>
 where
     E: IsEvent + Send + Sync + 'static,
-    <E as event_emitter::IsEvent>::EventType: Send + Sync
+    <E as event_emitter::IsEvent>::EventType: Send + Sync,
 {
     consume(&mut rx).await?;
     let sleep = sleep(Duration::from_millis(timeout as u64));
@@ -80,7 +82,7 @@ where
             match rx.recv().await {
                 Ok(x) if x.event_type() == evt => break Ok(x),
                 Ok(_) => continue,
-                Err(e) => break Err(e)
+                Err(e) => break Err(e),
             }
         }
     });
@@ -92,7 +94,7 @@ where
 
 async fn consume<E>(rx: &mut broadcast::Receiver<E>) -> Result<(), Error>
 where
-    E: IsEvent
+    E: IsEvent,
 {
     loop {
         match rx.try_recv() {

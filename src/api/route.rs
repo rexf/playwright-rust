@@ -3,15 +3,15 @@ use crate::{
     imp::{
         core::*,
         prelude::*,
-        route::{ContinueArgs, FulfillArgs, Route as Impl}
-    }
+        route::{ContinueArgs, FulfillArgs, Route as Impl},
+    },
 };
 
 /// Whenever a network route is set up with [`method: Page.route`] or [`method: BrowserContext.route`], the `Route` object
 /// allows to handle the route.
 #[derive(Debug)]
 pub struct Route {
-    inner: Weak<Impl>
+    inner: Weak<Impl>,
 }
 
 impl PartialEq for Route {
@@ -25,7 +25,9 @@ impl PartialEq for Route {
 }
 
 impl Route {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     /// A request to be routed.
     pub fn request(&self) -> Request {
@@ -34,7 +36,9 @@ impl Route {
     }
 
     /// Continue processing using the default handler (like Java/Python `fallback()`).
-    pub async fn fallback(&self) -> ArcResult<()> { upgrade(&self.inner)?.fallback().await }
+    pub async fn fallback(&self) -> ArcResult<()> {
+        upgrade(&self.inner)?.fallback().await
+    }
 
     /// Aborts the route's request.
     /// Optional error code. Defaults to `failed`, could be one of the following:
@@ -74,7 +78,7 @@ impl Route {
     pub async fn fulfill_builder<'a>(
         &self,
         body: &'a str,
-        is_base64: bool
+        is_base64: bool,
     ) -> FulfillBuilder<'a, '_> {
         FulfillBuilder::new(self.inner.clone(), body, is_base64)
     }
@@ -99,7 +103,7 @@ impl Route {
 
 pub struct FulfillBuilder<'a, 'b> {
     inner: Weak<Impl>,
-    args: FulfillArgs<'a, 'b>
+    args: FulfillArgs<'a, 'b>,
 }
 
 impl<'a, 'b> FulfillBuilder<'a, 'b> {
@@ -116,7 +120,7 @@ impl<'a, 'b> FulfillBuilder<'a, 'b> {
     /// Response headers. Header values will be converted to a string.
     pub fn headers<T>(mut self, x: T) -> Self
     where
-        T: IntoIterator<Item = (String, String)>
+        T: IntoIterator<Item = (String, String)>,
     {
         self.args.headers = Some(x.into_iter().map(Header::from).collect());
         self
@@ -137,7 +141,7 @@ impl<'a, 'b> FulfillBuilder<'a, 'b> {
 
 pub struct ContinueBuilder<'a, 'b, 'c> {
     inner: Weak<Impl>,
-    args: ContinueArgs<'a, 'b, 'c>
+    args: ContinueArgs<'a, 'b, 'c>,
 }
 
 impl<'a, 'b, 'c> ContinueBuilder<'a, 'b, 'c> {
@@ -154,7 +158,7 @@ impl<'a, 'b, 'c> ContinueBuilder<'a, 'b, 'c> {
     /// If set changes the request HTTP headers. Header values will be converted to a string.
     pub fn headers<T>(mut self, x: T) -> Self
     where
-        T: IntoIterator<Item = (String, String)>
+        T: IntoIterator<Item = (String, String)>,
     {
         self.args.headers = Some(x.into_iter().map(Header::from).collect());
         self

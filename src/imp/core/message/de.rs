@@ -1,6 +1,6 @@
 use serde::{
     de,
-    de::{IntoDeserializer, Visitor}
+    de::{IntoDeserializer, Visitor},
 };
 use serde_json::value::{Map, Value};
 use std::convert::TryFrom;
@@ -16,20 +16,20 @@ pub enum Error {
     #[error("{0:} isn't supported")]
     NotSupported(&'static str),
     #[error(transparent)]
-    Serde(#[from] serde_json::Error)
+    Serde(#[from] serde_json::Error),
 }
 
 impl de::Error for Error {
     fn custom<T>(msg: T) -> Self
     where
-        T: std::fmt::Display
+        T: std::fmt::Display,
     {
         Self::Msg(msg.to_string())
     }
 }
 
 pub(crate) struct Deserializer<'de> {
-    stack: Vec<&'de Value>
+    stack: Vec<&'de Value>,
 }
 
 impl<'de> Deserializer<'de> {
@@ -38,12 +38,14 @@ impl<'de> Deserializer<'de> {
         Self { stack }
     }
 
-    fn pop(&mut self) -> Result<&'de Value, Error> { self.stack.pop().ok_or(Error::Blank) }
+    fn pop(&mut self) -> Result<&'de Value, Error> {
+        self.stack.pop().ok_or(Error::Blank)
+    }
 }
 
 pub(crate) fn from_value<T>(v: &Value) -> Result<T, Error>
 where
-    T: de::DeserializeOwned
+    T: de::DeserializeOwned,
 {
     let mut deserializer = Deserializer::new(v);
     let t = T::deserialize(&mut deserializer)?;
@@ -76,7 +78,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         log::trace!("any {:?}", self.stack);
         let v = *self.stack.last().ok_or(Error::Blank)?;
@@ -129,7 +131,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         let v = self.pop()?;
         let b1 = v
@@ -153,35 +155,35 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_char<V>(self, _: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         Err(Error::NotSupported("deserialize_char"))
     }
 
     fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         Err(Error::NotSupported("deserialize_bytes"))
     }
 
     fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         Err(Error::NotSupported("deserialize_byte_buf"))
     }
 
     fn deserialize_f32<V>(self, _: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         Err(Error::NotSupported("deserialize_f32"))
     }
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         let v = self.pop()?;
         let f1 = v
@@ -199,7 +201,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 "-Infinity" => Some(f64::NEG_INFINITY),
                 "-0" => Some(-0.0),
                 "NaN" => Some(f64::NAN),
-                _ => None
+                _ => None,
             })
             .ok_or(Error::TypeMismatch);
         let f = f1.or(f2).or(f3)?;
@@ -208,7 +210,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         log::trace!("str {:?}", self.stack);
         let v = self.pop()?;
@@ -224,14 +226,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.deserialize_str(visitor)
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         let v = self.pop()?;
         let n1 = v
@@ -241,7 +243,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             .and_then(|s| match s {
                 "undefined" => Some(()),
                 "null" => Some(()),
-                _ => None
+                _ => None,
             });
         let n2 = v.as_null();
         let is_null = n1.or(n2).is_some();
@@ -255,7 +257,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         log::trace!("unit {:?}", self.stack);
         let v = self.pop()?;
@@ -266,7 +268,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
             .and_then(|s| match s {
                 "undefined" => Some(()),
                 "null" => Some(()),
-                _ => None
+                _ => None,
             });
         let n2 = v.as_null();
         let _ = n1.or(n2).ok_or(Error::TypeMismatch)?;
@@ -276,10 +278,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     fn deserialize_unit_struct<V>(
         self,
         _name: &'static str,
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.deserialize_unit(visitor)
     }
@@ -287,17 +289,17 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     fn deserialize_newtype_struct<V>(
         self,
         _name: &'static str,
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         visitor.visit_newtype_struct(self)
     }
 
     fn deserialize_seq<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         let v = self.pop()?;
         let a1 = v
@@ -312,7 +314,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.deserialize_seq(visitor)
     }
@@ -321,10 +323,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self,
         _name: &'static str,
         _len: usize,
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.deserialize_seq(visitor)
     }
@@ -332,7 +334,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
     // TODO: datetime
     fn deserialize_map<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         let v = self.pop()?;
         let m = v.as_object().ok_or(Error::TypeMismatch)?;
@@ -357,10 +359,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self,
         _name: &'static str,
         _fields: &'static [&'static str],
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.deserialize_map(visitor)
     }
@@ -369,10 +371,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
         self,
         _name: &'static str,
         _variants: &'static [&'static str],
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         log::trace!("enum {:?}", self.stack);
         let v = self.pop()?;
@@ -385,20 +387,20 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
                 }
                 visitor.visit_enum(Enum::new(self, m))
             }
-            _ => Err(Error::TypeMismatch)
+            _ => Err(Error::TypeMismatch),
         }
     }
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.deserialize_str(visitor)
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.deserialize_any(visitor)
     }
@@ -406,14 +408,14 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
 struct Array<'a, 'de: 'a> {
     prime: &'a mut Deserializer<'de>,
-    data: std::slice::Iter<'de, Value>
+    data: std::slice::Iter<'de, Value>,
 }
 
 impl<'a, 'de> Array<'a, 'de> {
     fn new(prime: &'a mut Deserializer<'de>, arr: &'de [Value]) -> Self {
         Array {
             prime,
-            data: arr.iter()
+            data: arr.iter(),
         }
     }
 }
@@ -423,11 +425,11 @@ impl<'de, 'a> de::SeqAccess<'de> for Array<'a, 'de> {
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
-        T: de::DeserializeSeed<'de>
+        T: de::DeserializeSeed<'de>,
     {
         let data = match self.data.next() {
             Some(x) => x,
-            None => return Ok(None)
+            None => return Ok(None),
         };
         self.prime.stack.push(data);
         seed.deserialize(&mut *self.prime).map(Some)
@@ -437,7 +439,7 @@ impl<'de, 'a> de::SeqAccess<'de> for Array<'a, 'de> {
 struct Object<'a, 'de: 'a> {
     prime: &'a mut Deserializer<'de>,
     keys: serde_json::map::Keys<'de>,
-    values: serde_json::map::Values<'de>
+    values: serde_json::map::Values<'de>,
 }
 
 impl<'a, 'de> Object<'a, 'de> {
@@ -445,7 +447,7 @@ impl<'a, 'de> Object<'a, 'de> {
         Self {
             prime,
             keys: obj.keys(),
-            values: obj.values()
+            values: obj.values(),
         }
     }
 }
@@ -455,22 +457,22 @@ impl<'de, 'a> de::MapAccess<'de> for Object<'a, 'de> {
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
-        K: de::DeserializeSeed<'de>
+        K: de::DeserializeSeed<'de>,
     {
         let s = match self.keys.next() {
             Some(x) => x,
-            None => return Ok(None)
+            None => return Ok(None),
         };
         let mut d = KeyDeserializer {
             prime: &mut *self.prime,
-            s
+            s,
         };
         Ok(Some(seed.deserialize(&mut d)?))
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
     where
-        V: de::DeserializeSeed<'de>
+        V: de::DeserializeSeed<'de>,
     {
         let data = self.values.next().ok_or(Error::Blank)?;
         self.prime.stack.push(data);
@@ -481,7 +483,7 @@ impl<'de, 'a> de::MapAccess<'de> for Object<'a, 'de> {
 struct ObjectArr<'a, 'de: 'a> {
     prime: &'a mut Deserializer<'de>,
     arr: &'de [Value],
-    idx: usize
+    idx: usize,
 }
 
 impl<'a, 'de> ObjectArr<'a, 'de> {
@@ -495,7 +497,7 @@ impl<'de, 'a> de::MapAccess<'de> for ObjectArr<'a, 'de> {
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
-        K: de::DeserializeSeed<'de>
+        K: de::DeserializeSeed<'de>,
     {
         let data = if self.idx < self.arr.len() {
             self.idx += 1;
@@ -509,14 +511,14 @@ impl<'de, 'a> de::MapAccess<'de> for ObjectArr<'a, 'de> {
         let s = data.as_str().ok_or(Error::TypeMismatch)?;
         let mut d = KeyDeserializer {
             prime: &mut *self.prime,
-            s
+            s,
         };
         Ok(Some(seed.deserialize(&mut d)?))
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
     where
-        V: de::DeserializeSeed<'de>
+        V: de::DeserializeSeed<'de>,
     {
         let data = self.arr[self.idx - 1]
             .as_object()
@@ -529,7 +531,7 @@ impl<'de, 'a> de::MapAccess<'de> for ObjectArr<'a, 'de> {
 
 struct KeyDeserializer<'a, 'de: 'a> {
     prime: &'a mut Deserializer<'de>,
-    s: &'de str
+    s: &'de str,
 }
 
 macro_rules! key_int {
@@ -551,7 +553,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut KeyDeserializer<'a, 'de> {
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         visitor.visit_str(self.s)
     }
@@ -572,21 +574,21 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut KeyDeserializer<'a, 'de> {
 
     fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         Err(Error::NotSupported("deserialize_bytes"))
     }
 
     fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         Err(Error::NotSupported("deserialize_byte_buf"))
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         visitor.visit_some(self)
     }
@@ -594,10 +596,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut KeyDeserializer<'a, 'de> {
     fn deserialize_newtype_struct<V>(
         self,
         _name: &'static str,
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         visitor.visit_newtype_struct(self)
     }
@@ -606,10 +608,10 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut KeyDeserializer<'a, 'de> {
         self,
         name: &'static str,
         variants: &'static [&'static str],
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         self.prime.deserialize_enum(name, variants, visitor)
     }
@@ -617,7 +619,7 @@ impl<'de, 'a> de::Deserializer<'de> for &'a mut KeyDeserializer<'a, 'de> {
 
 struct Enum<'a, 'de: 'a> {
     prime: &'a mut Deserializer<'de>,
-    map: &'de Map<String, Value>
+    map: &'de Map<String, Value>,
 }
 
 impl<'a, 'de> Enum<'a, 'de> {
@@ -632,7 +634,7 @@ impl<'de, 'a> de::EnumAccess<'de> for Enum<'a, 'de> {
 
     fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
     where
-        V: de::DeserializeSeed<'de>
+        V: de::DeserializeSeed<'de>,
     {
         log::trace!("variant_seed {:?}", self.map);
         if let Some(a) = self.map.get("o") {
@@ -666,14 +668,14 @@ impl<'de, 'a> de::VariantAccess<'de> for Enum<'a, 'de> {
 
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
     where
-        T: de::DeserializeSeed<'de>
+        T: de::DeserializeSeed<'de>,
     {
         seed.deserialize(self.prime)
     }
 
     fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         de::Deserializer::deserialize_seq(self.prime, visitor)
     }
@@ -681,10 +683,10 @@ impl<'de, 'a> de::VariantAccess<'de> for Enum<'a, 'de> {
     fn struct_variant<V>(
         self,
         _fields: &'static [&'static str],
-        visitor: V
+        visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
+        V: Visitor<'de>,
     {
         de::Deserializer::deserialize_map(self.prime, visitor)
     }
@@ -706,7 +708,7 @@ mod tests {
             d: f64,
             e: Vec<Value>,
             mi: HashMap<i32, String>,
-            ms: HashMap<String, String>
+            ms: HashMap<String, String>,
         }
         let v = serde_json::from_str(
             r#"{ "o": [
@@ -716,7 +718,7 @@ mod tests {
             {"k": "e", "v": {"a": [{"n": 2.0}, {"b": false}]}},
             {"k": "ms", "v": {"o": [{"k": "2", "v": "as"}]}},
             {"k": "mi", "v": {"o": [{"k": "2", "v": "as"}]}}
-            ] }"#
+            ] }"#,
         )
         .unwrap();
         let de: Test = from_value(&v).unwrap();
@@ -755,7 +757,7 @@ mod tests {
             A,
             B(i32),
             Tuple(u32, u32),
-            Struct { a: u32 }
+            Struct { a: u32 },
         }
         let v = serde_json::from_str(r#"{"s": "A"}"#).unwrap();
         let de: Test = from_value(&v).unwrap();
@@ -768,7 +770,7 @@ mod tests {
         let de: Test = from_value(&v).unwrap();
         assert_eq!(de, Test::Tuple(0, 3));
         let v = serde_json::from_str(
-            r#"{"o": [{"k":"Struct", "v": {"o": [{"k":"a", "v": {"n":0}}]}}]}"#
+            r#"{"o": [{"k":"Struct", "v": {"o": [{"k":"a", "v": {"n":0}}]}}]}"#,
         )
         .unwrap();
         let de: Test = from_value(&v).unwrap();

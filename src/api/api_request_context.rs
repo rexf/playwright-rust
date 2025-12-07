@@ -3,13 +3,13 @@ use crate::{
     imp::{
         api_request_context::{
             APIRequestContext as Impl, FetchArgs, FilePayload, MultipartField, NameValue,
-            NewContextArgs
+            NewContextArgs,
         },
         core::*,
         prelude::*,
-        utils::{Header, HttpCredentials, ProxySettings}
+        utils::{Header, HttpCredentials, ProxySettings},
     },
-    Error
+    Error,
 };
 use base64::{engine::general_purpose, Engine as _};
 use serde_json::Value;
@@ -17,16 +17,18 @@ use serde_json::Value;
 /// Wrapper over the driver-side APIRequestContext.
 #[derive(Clone)]
 pub struct APIRequestContext {
-    pub(crate) inner: Weak<Impl>
+    pub(crate) inner: Weak<Impl>,
 }
 
 impl APIRequestContext {
-    pub(crate) fn new(inner: Weak<Impl>) -> Self { Self { inner } }
+    pub(crate) fn new(inner: Weak<Impl>) -> Self {
+        Self { inner }
+    }
 
     pub async fn fetch(
         &self,
         url: &str,
-        options: Option<RequestOptions>
+        options: Option<RequestOptions>,
     ) -> Result<APIResponse, Arc<Error>> {
         let args = options.unwrap_or_default().into_fetch_args(url);
         let payload = upgrade(&self.inner)?.fetch(args).await?;
@@ -36,7 +38,7 @@ impl APIRequestContext {
     pub async fn get(
         &self,
         url: &str,
-        mut options: Option<RequestOptions>
+        mut options: Option<RequestOptions>,
     ) -> Result<APIResponse, Arc<Error>> {
         options.get_or_insert_with(RequestOptions::default).method = Some("GET".into());
         self.fetch(url, options).await
@@ -45,7 +47,7 @@ impl APIRequestContext {
     pub async fn post(
         &self,
         url: &str,
-        mut options: Option<RequestOptions>
+        mut options: Option<RequestOptions>,
     ) -> Result<APIResponse, Arc<Error>> {
         options.get_or_insert_with(RequestOptions::default).method = Some("POST".into());
         self.fetch(url, options).await
@@ -54,7 +56,7 @@ impl APIRequestContext {
     pub async fn put(
         &self,
         url: &str,
-        mut options: Option<RequestOptions>
+        mut options: Option<RequestOptions>,
     ) -> Result<APIResponse, Arc<Error>> {
         options.get_or_insert_with(RequestOptions::default).method = Some("PUT".into());
         self.fetch(url, options).await
@@ -63,7 +65,7 @@ impl APIRequestContext {
     pub async fn delete(
         &self,
         url: &str,
-        mut options: Option<RequestOptions>
+        mut options: Option<RequestOptions>,
     ) -> Result<APIResponse, Arc<Error>> {
         options.get_or_insert_with(RequestOptions::default).method = Some("DELETE".into());
         self.fetch(url, options).await
@@ -72,7 +74,7 @@ impl APIRequestContext {
     pub async fn patch(
         &self,
         url: &str,
-        mut options: Option<RequestOptions>
+        mut options: Option<RequestOptions>,
     ) -> Result<APIResponse, Arc<Error>> {
         options.get_or_insert_with(RequestOptions::default).method = Some("PATCH".into());
         self.fetch(url, options).await
@@ -81,7 +83,7 @@ impl APIRequestContext {
     pub async fn head(
         &self,
         url: &str,
-        mut options: Option<RequestOptions>
+        mut options: Option<RequestOptions>,
     ) -> Result<APIResponse, Arc<Error>> {
         options.get_or_insert_with(RequestOptions::default).method = Some("HEAD".into());
         self.fetch(url, options).await
@@ -108,17 +110,21 @@ pub struct RequestOptions {
     pub fail_on_status_code: Option<bool>,
     pub ignore_https_errors: Option<bool>,
     pub max_redirects: Option<i32>,
-    pub max_retries: Option<i32>
+    pub max_retries: Option<i32>,
 }
 
 impl RequestOptions {
     pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.headers.get_or_insert_with(HashMap::new).insert(key.into(), value.into());
+        self.headers
+            .get_or_insert_with(HashMap::new)
+            .insert(key.into(), value.into());
         self
     }
 
     pub fn param(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.params.get_or_insert_with(HashMap::new).insert(key.into(), value.into());
+        self.params
+            .get_or_insert_with(HashMap::new)
+            .insert(key.into(), value.into());
         self
     }
 
@@ -156,23 +162,18 @@ impl RequestOptions {
                 params
                     .into_iter()
                     .map(|(k, v)| NameValue::new(k, v))
-                    .collect()
+                    .collect(),
             );
         }
         if let Some(form) = self.form {
             args.form_data = Some(
                 form.into_iter()
                     .map(|(k, v)| NameValue::new(k, v))
-                    .collect()
+                    .collect(),
             );
         }
         if let Some(multipart) = self.multipart {
-            args.multipart_data = Some(
-                multipart
-                    .into_iter()
-                    .map(|m| m.into_field())
-                    .collect()
-            );
+            args.multipart_data = Some(multipart.into_iter().map(|m| m.into_field()).collect());
         }
         match self.data {
             Some(RequestData::Json(v)) => {
@@ -199,7 +200,7 @@ impl RequestOptions {
 pub enum RequestData {
     Bytes(Vec<u8>),
     Json(Value),
-    Text(String)
+    Text(String),
 }
 
 #[derive(Clone)]
@@ -208,7 +209,7 @@ pub struct MultipartEntry {
     pub value: Option<String>,
     pub file_name: Option<String>,
     pub mime_type: Option<String>,
-    pub buffer: Option<Vec<u8>>
+    pub buffer: Option<Vec<u8>>,
 }
 
 impl MultipartEntry {
@@ -218,7 +219,7 @@ impl MultipartEntry {
             value: Some(value.into()),
             file_name: None,
             mime_type: None,
-            buffer: None
+            buffer: None,
         }
     }
 
@@ -226,14 +227,14 @@ impl MultipartEntry {
         name: impl Into<String>,
         file_name: impl Into<String>,
         mime_type: Option<String>,
-        buffer: Vec<u8>
+        buffer: Vec<u8>,
     ) -> Self {
         Self {
             name: name.into(),
             value: None,
             file_name: Some(file_name.into()),
             mime_type,
-            buffer: Some(buffer)
+            buffer: Some(buffer),
         }
     }
 
@@ -242,14 +243,14 @@ impl MultipartEntry {
             (Some(name), Some(buffer)) => Some(FilePayload {
                 name,
                 mime_type: self.mime_type,
-                buffer: general_purpose::STANDARD.encode(&buffer)
+                buffer: general_purpose::STANDARD.encode(&buffer),
             }),
-            _ => None
+            _ => None,
         };
         MultipartField {
             name: self.name,
             value: self.value,
-            file
+            file,
         }
     }
 }
@@ -264,7 +265,7 @@ pub struct NewContextOptions {
     pub fail_on_status_code: Option<bool>,
     pub proxy: Option<ProxySettings>,
     pub storage_state: Option<Value>,
-    pub http_credentials: Option<HttpCredentials>
+    pub http_credentials: Option<HttpCredentials>,
 }
 
 impl NewContextOptions {
@@ -329,7 +330,7 @@ impl From<NewContextOptions> for NewContextArgs {
             fail_on_status_code: opts.fail_on_status_code,
             proxy: opts.proxy,
             storage_state: opts.storage_state,
-            http_credentials: opts.http_credentials
+            http_credentials: opts.http_credentials,
         }
     }
 }
